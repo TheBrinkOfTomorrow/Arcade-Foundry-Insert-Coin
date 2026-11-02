@@ -175,9 +175,13 @@ struct GameDetailView: View {
             if core == nil {
                 Text(CoreLibrary.unavailable(version.id)).font(.caption).foregroundStyle(.secondary)
             } else if rom == nil && inCloud == nil {
+                // Borderless: with the default style a tap anywhere in a list row
+                // presses every button in it, so Download also opened the file picker.
                 Button("Add ROM…") { importing = true }
+                    .buttonStyle(.borderless)
                 if !romServer.isEmpty {
                     Button(downloading == version.id ? downloads.label(version.id) : "Download") { download(version) }
+                        .buttonStyle(.borderless)
                         .disabled(downloading != nil)
                 }
             } else {

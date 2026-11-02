@@ -14,7 +14,7 @@ configFiles:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "0.2.0" # x.y.z, the same as linux/CMakeLists.txt
+    MARKETING_VERSION: "1.0.1" # x.y.z, the same as linux/CMakeLists.txt
     CURRENT_PROJECT_VERSION: "1"
     PRODUCT_NAME: Arcade Foundry Insert Coin # the .app file name: no colon allowed, the display name below has it
     PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID) # Signing.xcconfig, or yours in Local.xcconfig
@@ -80,12 +80,14 @@ targets:
       path: InsertCoin/Support/Info-macOS.plist
       properties:
         CFBundleDisplayName: "Arcade Foundry: Insert Coin"
+        CFBundleShortVersionString: $(MARKETING_VERSION) # XcodeGen writes a literal 1.0 and 1 otherwise, and About showed "1.0 (1)"
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.racing-games
         NSLocalNetworkUsageDescription: "Link play with Arcade Foundry: Insert Coin on your other devices, Apple Vision Pro, and your ROM server." # without it macOS denies the headset connection
         NSWorldSensingUsageDescription: "Tracks your head in Apple Vision Pro so the game follows where you look."
         NSBonjourServices: [_arcadefoundry._tcp] # link play finds the other cabinets
         GCSupportsControllerUserInteraction: true
-        NSAppTransportSecurity: { NSAllowsArbitraryLoads: true } # your own ROM server, often plain http on the LAN
+        NSAppTransportSecurity: { NSAllowsLocalNetworking: true } # your own ROM server, often plain http on the LAN; everything else keeps TLS
         ITSAppUsesNonExemptEncryption: false
         NSUbiquitousContainers: # the "Arcade Foundry" folder in iCloud Drive, for ROM sets
           iCloud.$(PRODUCT_BUNDLE_IDENTIFIER):
@@ -105,6 +107,8 @@ targets:
       path: InsertCoin/Support/Info-iOS.plist
       properties:
         CFBundleDisplayName: "Arcade Foundry: Insert Coin"
+        CFBundleShortVersionString: $(MARKETING_VERSION) # XcodeGen writes a literal 1.0 and 1 otherwise, and About showed "1.0 (1)"
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: { UIImageName: LaunchLogo, UIColorName: LaunchBackground } # the title screen picture (sized per device: a launch screen does not scale it), until the app is up
         UIRequiresFullScreen: true
         UIStatusBarHidden: true
@@ -116,7 +120,7 @@ targets:
         LSSupportsOpeningDocumentsInPlace: false
         NSLocalNetworkUsageDescription: "Link play with Arcade Foundry: Insert Coin on your other devices, and your ROM server."
         NSBonjourServices: [_arcadefoundry._tcp] # link play finds the other cabinets
-        NSAppTransportSecurity: { NSAllowsArbitraryLoads: true }
+        NSAppTransportSecurity: { NSAllowsLocalNetworking: true }
         ITSAppUsesNonExemptEncryption: false
         NSUbiquitousContainers: # the "Arcade Foundry" folder in iCloud Drive, for ROM sets
           iCloud.$(PRODUCT_BUNDLE_IDENTIFIER):
@@ -135,12 +139,14 @@ targets:
       path: InsertCoin/Support/Info-tvOS.plist
       properties:
         CFBundleDisplayName: "Arcade Foundry: Insert Coin"
+        CFBundleShortVersionString: $(MARKETING_VERSION) # XcodeGen writes a literal 1.0 and 1 otherwise, and About showed "1.0 (1)"
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: { UIImageName: LaunchLogo, UIColorName: LaunchBackground } # the title screen picture (sized per device: a launch screen does not scale it), until the app is up
         GCSupportsControllerUserInteraction: true
         GCSupportedGameControllers: [{ ProfileName: ExtendedGamepad }]
         NSLocalNetworkUsageDescription: "Link play with Arcade Foundry: Insert Coin on your other devices, and your ROM server."
         NSBonjourServices: [_arcadefoundry._tcp] # link play finds the other cabinets
-        NSAppTransportSecurity: { NSAllowsArbitraryLoads: true }
+        NSAppTransportSecurity: { NSAllowsLocalNetworking: true }
         ITSAppUsesNonExemptEncryption: false
     settings:
       base:

@@ -2,6 +2,16 @@
 
 Newest first. Each release is also on the repository's Releases page.
 
+## 1.0.1 (2026-11-02)
+
+Fixes only; the game cores are unchanged and stay at their 1.0.0 tags.
+
+- The app's About said "1.0 (1)" on every Apple platform (the generated Info.plist did not take the project's version) and the Linux app said 0.2.0. Both now say 1.0.1, and `scripts/check_release.py` refuses a release whose version numbers disagree.
+- App Transport Security now allows plain http only on the local network (`NSAllowsLocalNetworking`), which is all a ROM server on your LAN needs; every other connection keeps TLS.
+- README: the "Using the app" section rewritten.
+- iPad: the on-screen controller shown when no controller is connected now has a B button on every layout (view 2 in play), so operator mode has its SERVICE button and the test menus can be used.
+- iPad: on a game's page, Download no longer opens the Add ROM file picker as well (a tap on the row pressed both buttons).
+
 ## 1.0.0 (2026-11-02)
 
 **Arcade Foundry: Insert Coin 1.0.0**

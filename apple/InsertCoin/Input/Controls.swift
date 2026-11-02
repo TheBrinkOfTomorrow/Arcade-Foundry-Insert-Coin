@@ -181,17 +181,19 @@ final class Controls {
 
     #if os(iOS)
     /// On-screen controls when no controller is connected: stick to steer,
-    /// triggers for the pedals, shoulders to shift, A for the view; for
-    /// Virtua Fighter 2 the stick and X, A, B (punch, kick, guard).
+    /// triggers for the pedals, shoulders to shift, A and B for the views;
+    /// for Virtua Fighter 2 the stick and X, A, B (punch, kick, guard);
+    /// Bass Fishing the stick, triggers, X (cast), A and B. Every layout
+    /// has A and B, which operator mode needs as TEST and SERVICE.
     private var virtualPad: GCVirtualController?
 
     func showTouchControls(_ show: Bool, fighting: Bool = false, fishing: Bool = false) {
         if show && virtualPad == nil && GCController.controllers().allSatisfy({ $0.extendedGamepad == nil }) {
             let cfg = GCVirtualController.Configuration()
             cfg.elements = fighting ? [GCInputLeftThumbstick, GCInputButtonX, GCInputButtonA, GCInputButtonB, GCInputButtonY]
-                : fishing ? [GCInputLeftThumbstick, GCInputRightTrigger, GCInputLeftTrigger, GCInputButtonX, GCInputButtonA]
+                : fishing ? [GCInputLeftThumbstick, GCInputRightTrigger, GCInputLeftTrigger, GCInputButtonX, GCInputButtonA, GCInputButtonB]
                 : [GCInputLeftThumbstick, GCInputRightTrigger, GCInputLeftTrigger,
-                   GCInputRightShoulder, GCInputLeftShoulder, GCInputButtonA]
+                   GCInputRightShoulder, GCInputLeftShoulder, GCInputButtonA, GCInputButtonB]
             let pad = GCVirtualController(configuration: cfg)
             pad.connect()
             virtualPad = pad

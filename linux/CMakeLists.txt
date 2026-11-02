@@ -3,7 +3,7 @@
 # The game cores come from scripts/build_cores.py (build/cores/linux), and
 # SDL from the recompiler's pinned copy (its scripts/setup.py fetches it).
 cmake_minimum_required(VERSION 3.20)
-project(insert_coin VERSION 0.2.0 LANGUAGES C CXX) # x.y.z, the same as apple/project.yml
+project(insert_coin VERSION 1.0.1 LANGUAGES C CXX) # x.y.z, the same as apple/project.yml
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(NOT CMAKE_BUILD_TYPE)

@@ -105,31 +105,31 @@ network is fine; don't expose it to the internet.
 ## Using the app
 
 ### Controllers
+
 Controllers, keyboards, mice and touch all work; [GAMES.md](GAMES.md#controls)
-lists each game's controls. 
-A game controller's Back/Options inserts a coin,
+lists each game's controls. A game controller's Back/Options inserts a coin,
 Start presses start, and both together open the pause menu.
 
-On a Mac, iPhone, iPad or Apple TV a each game has it's own settings within which 
-the controller buttons can be (re)assigned.
-(Controller: choose an action, then press its new button).
-On Linux the setting is located in the pause menu : choose a button, then press the one to use in its
-place (a trigger works too); Reset goes back to the default. Saved per
-game in `~/.local/share/arcade-foundry/buttons/<romset>`.
+On a Mac, iPhone, iPad or Apple TV each game has its own settings, where the
+controller buttons can be reassigned (Controller: choose an action, then
+press its new button). On Linux the setting is in the pause menu: choose a
+button, then press the one to use in its place (a trigger works too); Reset
+goes back to the default. Saved per game in
+`~/.local/share/arcade-foundry/buttons/<romset>`.
 
 ### Library
-Library: one card per game and platform, with filters: 
-#### Platform:
-(All, Classic 2D, Model 1, Model 2, Model 3, Lindbergh) next to
-Settings, and 
-#### All | Playable:
-Playable shows only the games with a core in this build and a ROM set on
-the device or in iCloud Drive (remembered); C
-#### View type - Cards | List:
-toggles between individual tiles or compact rows with a small picture
 
-### Game Cards
-A card opens the game's page: its versions (e.g. Daytona USA and
+One card per game and platform, with three controls next to Settings:
+
+- **Platform**: All, Classic 2D, Model 1, Model 2, Model 3 or Lindbergh.
+- **All | Playable**: Playable shows only the games with a core in this build
+  and a ROM set on the device or in iCloud Drive. The choice is remembered.
+- **Cards | List**: tiles with the game's picture, or compact rows with a
+  small picture.
+
+### Game pages
+
+A card opens the game's page: its versions (for example Daytona USA and
 Daytona USA Revision A), each played, downloaded or added there, and the
 options of the version chosen under "Options for" (link play, picture,
 controller, ROM set). With a controller on a Mac or iPad the d-pad moves
@@ -138,35 +138,37 @@ versions, "About this game" tells the game's history, with links to read
 more (not on Apple TV).
 
 ### Appearance
-Appearance: the app is dark by default. Settings > Appearance switches it
-to Light or to Match the system (macOS, iOS and tvOS). On Linux the menu is
-always dark.
+
+The app is dark by default. Settings > Appearance switches it to Light or
+to Match the system (macOS, iOS and tvOS). On Linux the menu is always dark.
 
 ### Credits
-Credits: everyone whose work the app and cores use, with their licences,
-are in [CREDITS.md](CREDITS.md). The app shows them under Settings > About
-> Credits (iPhone, iPad, Apple TV), in the About window from the app menu
+
+Everyone whose work the app and cores use, with their licences, is in
+[CREDITS.md](CREDITS.md). The app shows them under Settings > About >
+Credits (iPhone, iPad, Apple TV), in the About window from the app menu
 (Mac), and from the game list with C or the gamepad's West button (Linux,
 or `insert-coin --credits`).
 
 ### Screen size and effects
-There are golboal settings, and also per-game settings 
-#### Shape:
-- Original (4:3 for the classic 2D boards and Model 1 through 3, wider for Lindbergh/other)
-- Stretch to fill
-- Whole-number scale (every line of the game as tall, best with scanlines)
 
-#### Effect: 
-- None
-- Scanlines
-- CRT (a curved tube, the shadow mask and a glow; on Linux without the curve and glow)
-- Smooth pixels, Size (80-120%) and Move across/down, for TVs that cut off the picture's edges
+These are global settings in Settings, and each game can have its own on its
+page or in the pause menu.
 
-### Library pictures: 
-each game's card shows the game's screen, taken by itself
-after half a minute of its first play, or with "Use this screen as the
-picture" in the pause menu. On a Mac, iPhone or iPad the game's page
-can use an image of your own instead.
+- **Shape**: Original (4:3 for the classic 2D boards and Model 1 through 3,
+  wider for Lindbergh), Stretch to fill, or Whole-number scale (every line
+  of the game as tall, best with scanlines).
+- **Effect**: None, Scanlines, or CRT (a curved tube, the shadow mask and a
+  glow; on Linux without the curve and glow).
+- **Smooth pixels**, **Size** (80-120%) and **Move** across and down, for
+  TVs that cut off the picture's edges.
+
+### Library pictures
+
+Each game's card shows the game's screen, taken by itself after half a
+minute of its first play, or with "Use this screen as the picture" in the
+pause menu. On a Mac, iPhone or iPad the game's page can use an image of
+your own instead.
 
 ## Gameplay videos (Apple platforms only)
 
@@ -268,11 +270,3 @@ keep their own BSD-3-Clause licence and third-party notices
 and are not covered by this licence; don't redistribute them. Model 3
 cores (the `cores/arcade-foundry-cores-model3` submodule) are GPL-3.0-or-later,
 as Supermodel is.
-
-## Version numbers
-
-The app and each game core are versioned separately. The release number on this
-repository (for example v1.0.0) is a snapshot label: it means "as shipped with
-Arcade Foundry: Insert Coin 1.0.0". Every game core also has its own x.y.z
-version (shown in the app), which can be higher or lower than the release number.
-A core's major number only changes when its saves stop carrying over.

@@ -153,11 +153,9 @@ struct AboutCreditsButton: View {
 #endif
 
 enum AppInfo {
-    /// "1.0.0 (12)": the version and build.
+    /// "1.0.1": the version. The build number (CFBundleVersion) is left out:
+    /// it only tells App Store uploads of one version apart, and these builds are sideloaded.
     static var version: String {
-        let info = Bundle.main.infoDictionary
-        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
-        let build = info?["CFBundleVersion"] as? String ?? "?"
-        return "\(version) (\(build))"
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
     }
 }

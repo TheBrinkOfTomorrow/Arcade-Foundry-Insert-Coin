@@ -87,7 +87,7 @@ final class HeadsetRenderer {
     static func start(_ layer: LayerRenderer, arSession: ARKitSession?) {
         guard let renderer = HeadsetRenderer(layer: layer, arSession: arSession) else { return }
         let thread = Thread { renderer.run() }
-        thread.name = "Attract Mode headset"
+        thread.name = "Insert Coin headset"
         thread.qualityOfService = .userInteractive
         thread.start()
     }
