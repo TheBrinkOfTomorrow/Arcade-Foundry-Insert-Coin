@@ -268,3 +268,11 @@ keep their own BSD-3-Clause licence and third-party notices
 and are not covered by this licence; don't redistribute them. Model 3
 cores (the `cores/arcade-foundry-cores-model3` submodule) are GPL-3.0-or-later,
 as Supermodel is.
+
+## Version numbers
+
+The app and each game core are versioned separately. The release number on this
+repository (for example v1.0.0) is a snapshot label: it means "as shipped with
+Arcade Foundry: Insert Coin 1.0.0". Every game core also has its own x.y.z
+version (shown in the app), which can be higher or lower than the release number.
+A core's major number only changes when its saves stop carrying over.
