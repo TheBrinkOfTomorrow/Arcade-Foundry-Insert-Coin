@@ -1,0 +1,7 @@
+// Made by CMake from history/<romset>.md (linux/CMakeLists.txt); don't edit.
+#pragma once
+struct HistoryFile {
+    const char *romset, *text;
+};
+static const HistoryFile HISTORY_MD[] = {
+@HISTORY_ENTRIES@};

@@ -1,0 +1,171 @@
+# XcodeGen spec: `xcodegen` here writes InsertCoin.xcodeproj (git-ignored).
+# One app, three targets (macOS, iOS/iPadOS, tvOS) over the same sources.
+name: InsertCoin
+options:
+  deploymentTarget:
+    macOS: "26.0" # Apple Vision Pro from the Mac (RemoteImmersiveSpace)
+    iOS: "16.0"
+    tvOS: "16.0"
+# Signing: your team ID (and your own bundle ID, APP_BUNDLE_ID) go in
+# Local.xcconfig (git-ignored), see Signing.xcconfig.
+configFiles:
+  Debug: Signing.xcconfig
+  Release: Signing.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "0.2.0" # x.y.z, the same as linux/CMakeLists.txt
+    CURRENT_PROJECT_VERSION: "1"
+    PRODUCT_NAME: Arcade Foundry Insert Coin # the .app file name: no colon allowed, the display name below has it
+    PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID) # Signing.xcconfig, or yours in Local.xcconfig
+    SWIFT_OBJC_BRIDGING_HEADER: InsertCoin/Core/Bridging.h
+    HEADER_SEARCH_PATHS: $(SRCROOT)/../cores/arcade-foundry-cores-model12/include
+targetTemplates:
+  App:
+    type: application
+    sources:
+      # Each target's own Info plist is its INFOPLIST_FILE; without the
+      # exclude the other two are copied in as resources, and on the device
+      # CFBundle reads Info-macOS.plist (unexpanded) instead of Info.plist.
+      - path: InsertCoin
+        excludes: ["Support/Info-*.plist"]
+      # Each game's history for its page (history/<romset>.md), as a folder.
+      - path: ../history
+        type: folder
+      # The credits (Settings > About > Credits, the Mac's About window).
+      - path: ../CREDITS.md
+        buildPhase: resources
+    postBuildScripts:
+      # The cores scripts/build_cores.py built from your ROM sets for this
+      # platform (build/cores/<platform>), copied in and signed with the app.
+      # The app finds them at run time (dlopen), so it builds and runs with
+      # any subset, or none.
+      - name: Embed game cores
+        basedOnDependencyAnalysis: false
+        script: |
+          set -e
+          SRC="$SRCROOT/../build/cores/$PLATFORM_NAME"
+          DST="$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH"
+          mkdir -p "$DST"
+          for fw in "$SRC"/afcore_*.framework; do
+            [ -d "$fw" ] || continue
+            rm -rf "$DST/$(basename "$fw")"
+            cp -R "$fw" "$DST/"
+            # App Store Connect wants each framework versioned like the app,
+            # with the app's minimum OS (iOS/tvOS) and an identifier of its own.
+            core_id=$(basename "$fw" .framework | tr _ -)
+            plist="$DST/$(basename "$fw")/Info.plist"
+            [ -f "$plist" ] || plist="$DST/$(basename "$fw")/Versions/A/Resources/Info.plist"
+            pb() { /usr/libexec/PlistBuddy -c "Set :$1 $2" "$plist" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :$1 string $2" "$plist"; }
+            pb CFBundleIdentifier "$PRODUCT_BUNDLE_IDENTIFIER.$core_id"
+            pb CFBundleShortVersionString "$MARKETING_VERSION"
+            pb CFBundleVersion "$CURRENT_PROJECT_VERSION"
+            case "$PLATFORM_NAME" in
+              iphoneos|iphonesimulator) pb MinimumOSVersion "$IPHONEOS_DEPLOYMENT_TARGET" ;;
+              appletvos|appletvsimulator) pb MinimumOSVersion "$TVOS_DEPLOYMENT_TARGET" ;;
+            esac
+            if [ -n "$EXPANDED_CODE_SIGN_IDENTITY" ]; then
+              # Libraries a core brings along (Model 3: SDL2) are signed first.
+              for lib in "$DST/$(basename "$fw")"/Versions/A/Libraries/*.dylib; do
+                [ -f "$lib" ] && codesign --force --sign "$EXPANDED_CODE_SIGN_IDENTITY" --timestamp=none "$lib"
+              done
+              codesign --force --sign "$EXPANDED_CODE_SIGN_IDENTITY" --timestamp=none "$DST/$(basename "$fw")"
+            fi
+          done
+targets:
+  InsertCoin-macOS:
+    templates: [App]
+    platform: macOS
+    info:
+      path: InsertCoin/Support/Info-macOS.plist
+      properties:
+        CFBundleDisplayName: "Arcade Foundry: Insert Coin"
+        LSApplicationCategoryType: public.app-category.racing-games
+        NSLocalNetworkUsageDescription: "Link play with Arcade Foundry: Insert Coin on your other devices, Apple Vision Pro, and your ROM server." # without it macOS denies the headset connection
+        NSWorldSensingUsageDescription: "Tracks your head in Apple Vision Pro so the game follows where you look."
+        NSBonjourServices: [_arcadefoundry._tcp] # link play finds the other cabinets
+        GCSupportsControllerUserInteraction: true
+        NSAppTransportSecurity: { NSAllowsArbitraryLoads: true } # your own ROM server, often plain http on the LAN
+        ITSAppUsesNonExemptEncryption: false
+        NSUbiquitousContainers: # the "Arcade Foundry" folder in iCloud Drive, for ROM sets
+          iCloud.$(PRODUCT_BUNDLE_IDENTIFIER):
+            NSUbiquitousContainerIsDocumentScopePublic: true
+            NSUbiquitousContainerName: Arcade Foundry
+            NSUbiquitousContainerSupportedFolderLevels: Any
+    settings:
+      base:
+        CODE_SIGN_ENTITLEMENTS: InsertCoin/Support/InsertCoin.entitlements
+        ARCHS: arm64 # the cores are built for Apple silicon only
+        ENABLE_HARDENED_RUNTIME: NO # cores are opened at run time; turn on (with library validation off) to notarize
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
+  InsertCoin-iOS:
+    templates: [App]
+    platform: iOS
+    info:
+      path: InsertCoin/Support/Info-iOS.plist
+      properties:
+        CFBundleDisplayName: "Arcade Foundry: Insert Coin"
+        UILaunchScreen: { UIImageName: LaunchLogo, UIColorName: LaunchBackground } # the title screen picture (sized per device: a launch screen does not scale it), until the app is up
+        UIRequiresFullScreen: true
+        UIStatusBarHidden: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight] # iPhone: the library also upright; a game turns it to landscape (AppDelegate)
+        UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        GCSupportsControllerUserInteraction: true
+        GCSupportedGameControllers: [{ ProfileName: ExtendedGamepad }]
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: false
+        NSLocalNetworkUsageDescription: "Link play with Arcade Foundry: Insert Coin on your other devices, and your ROM server."
+        NSBonjourServices: [_arcadefoundry._tcp] # link play finds the other cabinets
+        NSAppTransportSecurity: { NSAllowsArbitraryLoads: true }
+        ITSAppUsesNonExemptEncryption: false
+        NSUbiquitousContainers: # the "Arcade Foundry" folder in iCloud Drive, for ROM sets
+          iCloud.$(PRODUCT_BUNDLE_IDENTIFIER):
+            NSUbiquitousContainerIsDocumentScopePublic: true
+            NSUbiquitousContainerName: Arcade Foundry
+            NSUbiquitousContainerSupportedFolderLevels: Any
+    settings:
+      base:
+        CODE_SIGN_ENTITLEMENTS: InsertCoin/Support/InsertCoin-iOS.entitlements
+        TARGETED_DEVICE_FAMILY: "1,2"
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/Frameworks"
+  InsertCoin-tvOS:
+    templates: [App]
+    platform: tvOS
+    info:
+      path: InsertCoin/Support/Info-tvOS.plist
+      properties:
+        CFBundleDisplayName: "Arcade Foundry: Insert Coin"
+        UILaunchScreen: { UIImageName: LaunchLogo, UIColorName: LaunchBackground } # the title screen picture (sized per device: a launch screen does not scale it), until the app is up
+        GCSupportsControllerUserInteraction: true
+        GCSupportedGameControllers: [{ ProfileName: ExtendedGamepad }]
+        NSLocalNetworkUsageDescription: "Link play with Arcade Foundry: Insert Coin on your other devices, and your ROM server."
+        NSBonjourServices: [_arcadefoundry._tcp] # link play finds the other cabinets
+        NSAppTransportSecurity: { NSAllowsArbitraryLoads: true }
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        CODE_SIGN_ENTITLEMENTS: InsertCoin/Support/InsertCoin-tvOS.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: "App Icon & Top Shelf Image"
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/Frameworks"
+# Shared schemes (so xcodebuild can build them). Run has
+# Metal API Validation and GPU Frame Capture off: the Model 3 cores make many
+# small draw calls, and with both on (Xcode's default) Daytona USA 2 ran at
+# half speed from Xcode.
+schemes:
+  InsertCoin-macOS:
+    build: { targets: { InsertCoin-macOS: all } }
+    run: &run
+      config: Debug
+      enableGPUFrameCaptureMode: disabled
+      enableGPUValidationMode: false
+      environmentVariables:
+        ATTRACT_M3_TIMING: "1" # Model 3 cores: a timing line on stderr every 600 frames
+    archive: { config: Release }
+  InsertCoin-iOS:
+    build: { targets: { InsertCoin-iOS: all } }
+    run: *run
+    archive: { config: Release }
+  InsertCoin-tvOS:
+    build: { targets: { InsertCoin-tvOS: all } }
+    run: *run
+    archive: { config: Release }

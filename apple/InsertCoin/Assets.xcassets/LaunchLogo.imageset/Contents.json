@@ -1,0 +1,38 @@
+{
+  "images": [
+    {
+      "filename": "iphone-280@2x.png",
+      "idiom": "iphone",
+      "scale": "2x"
+    },
+    {
+      "filename": "iphone-280@3x.png",
+      "idiom": "iphone",
+      "scale": "3x"
+    },
+    {
+      "filename": "ipad-520@1x.png",
+      "idiom": "ipad",
+      "scale": "1x"
+    },
+    {
+      "filename": "ipad-520@2x.png",
+      "idiom": "ipad",
+      "scale": "2x"
+    },
+    {
+      "filename": "tv-800@1x.png",
+      "idiom": "tv",
+      "scale": "1x"
+    },
+    {
+      "filename": "tv-800@2x.png",
+      "idiom": "tv",
+      "scale": "2x"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  }
+}

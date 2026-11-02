@@ -1,0 +1,3 @@
+// Made by CMake from CREDITS.md (linux/CMakeLists.txt); don't edit.
+#pragma once
+static const char CREDITS_MD[] = R"credits(@CREDITS_TEXT@)credits";

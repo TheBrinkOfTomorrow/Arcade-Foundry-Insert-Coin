@@ -1,0 +1,11 @@
+// Signing for all targets. Put your Apple developer team ID in
+// Local.xcconfig next to this file (git-ignored):
+//   DEVELOPMENT_TEAM = ABCDE12345
+// and, unless you are this project's own team, a bundle ID of your own
+// (Apple registers a bundle ID and its iCloud container to one team):
+//   APP_BUNDLE_ID = com.example.arcadefoundry.insertcoin
+// The iCloud container is iCloud.<APP_BUNDLE_ID>. The team needs a paid
+// membership for iCloud (the shared ROM folder, settings and save backups).
+CODE_SIGN_STYLE = Automatic
+APP_BUNDLE_ID = com.thebrinkoftomorrow.arcadefoundry.insertcoin
+#include? "Local.xcconfig"

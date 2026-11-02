@@ -1,0 +1,10 @@
+build/
+roms/
+*.zip
+*.7z
+apple/InsertCoin.xcodeproj/
+xcuserdata/
+DerivedData/
+.DS_Store
+apple/InsertCoin/Support/Info-*.plist
+apple/Local.xcconfig

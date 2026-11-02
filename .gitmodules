@@ -1,0 +1,16 @@
+[submodule "cores/arcade-foundry-cores-model12"]
+	path = cores/arcade-foundry-cores-model12
+	url = https://github.com/TheBrinkOfTomorrow/Arcade-Foundry-Cores-Model12
+	branch = main
+[submodule "cores/arcade-foundry-cores-model3"]
+	path = cores/arcade-foundry-cores-model3
+	url = https://github.com/TheBrinkOfTomorrow/Arcade-Foundry-Cores-Model3
+	branch = main
+[submodule "cores/arcade-foundry-cores-lindbergh"]
+	path = cores/arcade-foundry-cores-lindbergh
+	url = https://github.com/TheBrinkOfTomorrow/Arcade-Foundry-Cores-Lindbergh
+	branch = main
+[submodule "cores/arcade-foundry-cores-classic2d"]
+	path = cores/arcade-foundry-cores-classic2d
+	url = https://github.com/TheBrinkOfTomorrow/Arcade-Foundry-Cores-Classic2D
+	branch = main
