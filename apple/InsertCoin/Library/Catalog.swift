@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 
 /// The arcade platforms, for the library's filter.
 enum Platform: String, CaseIterable, Identifiable {
-    case classic2d, model1, model2, model3, lindbergh
+    case classic2d, model1, model2, model3, lindbergh, chihiro
     var id: String { rawValue }
     var name: String {
         switch self {
@@ -12,144 +12,90 @@ enum Platform: String, CaseIterable, Identifiable {
         case .model2: "Model 2"
         case .model3: "Model 3"
         case .lindbergh: "Lindbergh"
+        case .chihiro: "Chihiro"
         }
     }
 }
 
 /// What this release leaves out while it is untested. The code stays: take a
-/// game's ROM set (or the headset button) out of here to bring it back.
+/// game's `hidden` out of games.toml (or turn the headset button on) to bring it back.
 enum ThisRelease {
-    /// Games not listed in the library (their cores, controls and saves stay).
-    static let hiddenGames: Set<String> = {
-        let sets: Set<String> = ["letsgoju", "segartv"] // Let's Go Jungle!, Sega Race TV: barely tested
-        return sets
-    }()
+    /// Games not listed in the library (their cores, controls and saves
+    /// stay): `hidden = true` in games.toml (scripts/gen_games.py).
+    static let hiddenGames = GameNames.hidden
     /// The Mac's "Play in Apple Vision Pro" button: not yet played end to end.
     static let headsetButton = false
 }
 
+/// How a game is played (games.toml's controls): picks the controller
+/// layout and the controls list on the game's page.
+enum GameControls {
+    case drive // a wheel and pedals, handlebars, or a stick and buttons that drive
+    case flight // a flight stick and throttle (Star Wars Arcade, Wing War)
+    case twin // two sticks, each with a shot and a dash (Virtual-On)
+    case gun // a light gun
+    case turret // a gun turret that draws its own sight (Gunblade NY, Behind Enemy Lines, Rail Chase 2)
+    case analogGun // Model 3's light guns: no off-screen sense, so the second trigger reloads
+    case fighting // a joystick and buttons: X, A, B and Y are buttons 1-4 (punch, kick, guard)
+    case fishing // Sega Bass Fishing and Get Bass: the left stick is the rod, the right trigger the reel
+}
+
 /// The ROM sets Arcade Foundry: Insert Coin knows, one per version of a game. A version is
 /// playable when this build has its core and the user has added its ROM set.
+/// The list is GameInfo.catalog in GameList.swift, written from games.toml
+/// (the app's and the cores') by scripts/gen_games.py.
 struct GameInfo: Identifiable, Hashable {
     let id: String // the MAME ROM set
     let title: String
     let detail: String
     var platform = Platform.model2
-    var link = true // the core has link play
-    var flight = false // a flight stick and throttle (Star Wars Arcade, Wing War), not a wheel and pedals
-    var twin = false // two sticks, each with a shot and a dash (Virtual-On)
-    var analogGun = false // Model 3's light guns: no off-screen sense, so the second trigger reloads
+    var controls = GameControls.drive
+    var link = false // the core has link play
+    var players = 1 // a second controller is player 2 when 2
+    var stickY = false // the left stick's forward and back is a second analog control (afcore_input.stick_y): Ski Super G's swing, Top Skater's slide, the fishing rod
+    var gunButton = false // the gun has a button besides the trigger: The House of the Dead 4's grenade, Line of Fire's missile (BUTTON3; Controls)
+
+    var flight: Bool { controls == .flight }
+    var twin: Bool { controls == .twin }
+    var analogGun: Bool { controls == .analogGun }
 
     /// Aimed like a gun (the light gun and turret games): the mouse, a
     /// touch, or either stick of a controller.
-    var aimsGun: Bool { analogGun || ["vcop", "vcop2", "hotdo", "gunblade", "bel", "rchase2", "hotd4a", "letsgoju"].contains(id) }
-
-    /// The gun has a button besides the trigger: The House of the Dead 4's
-    /// grenade (BUTTON3; Controls).
-    var gunButton: Bool { id == "hotd4a" }
+    var aimsGun: Bool { [.gun, .turret, .analogGun].contains(controls) }
 
     /// Gets a crosshair where a controller aims (CrosshairView): the gun
-    /// games but Gunblade NY, Behind Enemy Lines and Rail Chase 2, whose
-    /// turrets draw their own sight. The game's page can turn it off.
-    var showsCrosshair: Bool { aimsGun && !["gunblade", "bel", "rchase2"].contains(id) }
+    /// games but the turrets, which draw their own sight. The game's page can
+    /// turn it off.
+    var showsCrosshair: Bool { aimsGun && controls != .turret }
 
-    /// The left stick's forward and back is a second analog control
-    /// (afcore_input.stick_y): Sega Ski Super G's swing, Top Skater's slide,
-    /// Sega Bass Fishing's rod.
-    var stickY: Bool { ["skisuprg", "topskatr"].contains(id) || fishing }
+    /// The crosshair is on until turned off, but for Let's Go Jungle, which
+    /// draws its own reticle where the gun aims.
+    var crosshairByDefault: Bool { !["letsgoju", "letsgojua", "letsgojusp"].contains(id) }
 
     /// Sega Bass Fishing and Get Bass: the left stick is the rod, the right
     /// trigger the reel, the d-pad the lure stick, X cast and A select.
-    var fishing: Bool { ["bassdx", "getbass", "getbassur", "getbassdx"].contains(id) }
+    var fishing: Bool { controls == .fishing }
 
     /// A joystick and buttons (the fighting games, and the others played
     /// the same way): X, A, B and Y are buttons 1-4 (punch, kick, guard).
-    var fighting: Bool {
-        ["doab", "vf2", "fvipers", "vf", "vstriker", "zerogun", "pltkids", "dynamcop", "lastbrnx", "schamp", "dynabb97",
-         "vf3", "fvipers2", "spikeout", "spikeofe", "vs299a", "magtruck"].contains(id)
-    }
+    var fighting: Bool { controls == .fighting }
 
     /// The games this device can run, less `ThisRelease.hiddenGames`. Apple
     /// TV has no Lindbergh games: a Lindbergh core needs a 4 GB address window
     /// (iOS's extended virtual addressing), which tvOS does not give an app.
+    /// The Chihiro games need the same window, so they are on macOS and
+    /// iOS/iPadOS but not Apple TV.
     static let all: [GameInfo] = {
         #if os(tvOS)
-        catalog.filter { $0.platform != .lindbergh }
+        catalog.filter { $0.platform != .lindbergh && $0.platform != .chihiro && !ThisRelease.hiddenGames.contains($0.id) }
         #else
         catalog.filter { !ThisRelease.hiddenGames.contains($0.id) }
         #endif
     }()
 
-    private static let catalog: [GameInfo] = [
-        GameInfo(id: "daytona93", title: "Daytona USA", detail: "1993", link: false),
-        GameInfo(id: "daytona", title: "Daytona USA", detail: "1994, Revision A (link play)"),
-        GameInfo(id: "srallyc", title: "Sega Rally Championship", detail: "1995, Revision C (link play)"),
-        GameInfo(id: "manxttc", title: "Manx TT Superbike", detail: "1995, Revision C (Twin)"),
-        GameInfo(id: "motoraid", title: "Motor Raid", detail: "1997, Twin (Model 2A)", link: false),
-        GameInfo(id: "doab", title: "Dead or Alive", detail: "1996, Revision B (Model 2B; X punch, A kick, B hold; two players: a second controller)", link: false),
-        GameInfo(id: "lastbrnx", title: "Last Bronx", detail: "1996, Export, Revision A (Model 2B; two players: a second controller)", link: false),
-        GameInfo(id: "schamp", title: "Sonic Championship", detail: "1996, USA (Model 2B; two players: a second controller)", link: false),
-        GameInfo(id: "dynabb97", title: "Dynamite Baseball 97", detail: "1997, Revision A (Model 2B; X and A the buttons, B swings the bat; two players: a second controller)", link: false),
-        GameInfo(id: "waverunr", title: "Wave Runner", detail: "1996, Japan, Revision A (Model 2C)", link: false),
-        GameInfo(id: "bel", title: "Behind Enemy Lines", detail: "1997 (Model 2C)", link: false),
-        GameInfo(id: "topskatr", title: "Top Skater", detail: "1997, Export, Revision A (Model 2C; the left stick curves and slides)", link: false),
-        GameInfo(id: "skisuprg", title: "Sega Ski Super G", detail: "1996 (Model 2C)", link: false),
-        GameInfo(id: "segawski", title: "Sega Water Ski", detail: "1997, Japan, Revision A (Model 2C)", link: false),
-        GameInfo(id: "desert", title: "Desert Tank", detail: "1994 (Model 2)", link: false),
-        GameInfo(id: "skytargt", title: "Sky Target", detail: "1995 (Model 2A; the left stick flies)", link: false, flight: true),
-        GameInfo(id: "dynamcop", title: "Dynamite Cop", detail: "1998, Export (Model 2A; two players: a second controller)", link: false),
-        GameInfo(id: "vcop2", title: "Virtua Cop 2", detail: "1995 (light gun: mouse or touch)", link: false),
-        GameInfo(id: "vcop", title: "Virtua Cop", detail: "1994, Revision B (light gun: mouse or touch)", link: false),
-        GameInfo(id: "vf2", title: "Virtua Fighter 2", detail: "1994, Version 2.1 (two players: a second controller)", link: false),
-        GameInfo(id: "indy500", title: "INDY 500", detail: "1995, Twin, Revision A (Model 2B)"),
-        GameInfo(id: "fvipers", title: "Fighting Vipers", detail: "1995, Revision D (two players: a second controller)", link: false),
-        GameInfo(id: "sgt24h", title: "Super GT 24h", detail: "1996, Jaleco (Model 2B)", link: false),
-        GameInfo(id: "overrevb", title: "Over Rev", detail: "1997, Jaleco (Model 2B)", link: false),
-        GameInfo(id: "stcc", title: "Sega Touring Car Championship", detail: "1996, Model 2C", link: false),
-        GameInfo(id: "vstriker", title: "Virtua Striker", detail: "1994, Revision A (Model 2B; two players: a second controller)", link: false),
-        GameInfo(id: "zerogun", title: "Zero Gunner", detail: "1997, Export (Model 2B; two players: a second controller)", link: false),
-        GameInfo(id: "pltkids", title: "Pilot Kids", detail: "1998, Revision A (Model 2B; two players: a second controller)", link: false),
-        GameInfo(id: "rchase2", title: "Rail Chase 2", detail: "1994, Revision A (Model 2B; gun turrets: mouse or touch; two players: a second controller)", link: false),
-        GameInfo(id: "gunblade", title: "Gunblade NY", detail: "1995, Revision A (Model 2B; gun turret: mouse or touch)", link: false),
-        GameInfo(id: "hotdo", title: "The House of the Dead", detail: "1997, Model 2C (light gun: mouse or touch)", link: false),
-        GameInfo(id: "von", title: "Cyber Troopers Virtual-On", detail: "1995, Twin, Export (Model 2B; both sticks of the controller)", link: false, twin: true),
-        GameInfo(id: "vr", title: "Virtua Racing", detail: "1992 (link play)", platform: .model1),
-        GameInfo(id: "swa", title: "Star Wars Arcade", detail: "1993", platform: .model1, link: false, flight: true),
-        GameInfo(id: "vf", title: "Virtua Fighter", detail: "1993 (two players: a second controller)", platform: .model1, link: false),
-        GameInfo(id: "wingwar", title: "Wing War", detail: "1994", platform: .model1, link: false, flight: true),
-        GameInfo(id: "vf3", title: "Virtua Fighter 3", detail: "1996 (two players: a second controller)", platform: .model3, link: false),
-        GameInfo(id: "scud", title: "Scud Race", detail: "1996", platform: .model3, link: false),
-        GameInfo(id: "scudplus", title: "Scud Race", detail: "1997, Scud Race Plus", platform: .model3, link: false),
-        GameInfo(id: "daytona2", title: "Daytona USA 2", detail: "1998, Battle on the Edge", platform: .model3, link: false),
-        GameInfo(id: "dayto2pe", title: "Daytona USA 2", detail: "1998, Power Edition", platform: .model3, link: false),
-        GameInfo(id: "srally2", title: "Sega Rally 2", detail: "1998", platform: .model3, link: false),
-        GameInfo(id: "lemans24", title: "Le Mans 24", detail: "1997", platform: .model3, link: false),
-        GameInfo(id: "dirtdvls", title: "Dirt Devils", detail: "1998", platform: .model3, link: false),
-        GameInfo(id: "harley", title: "Harley-Davidson & L.A. Riders", detail: "1997 (two coins per credit)", platform: .model3, link: false),
-        GameInfo(id: "ecau", title: "Emergency Call Ambulance", detail: "1999", platform: .model3, link: false),
-        GameInfo(id: "fvipers2", title: "Fighting Vipers 2", detail: "1998 (two players: a second controller)", platform: .model3, link: false),
-        GameInfo(id: "von2", title: "Cyber Troopers Virtual-On Oratorio Tangram", detail: "1998 (both sticks of the controller; two coins per credit)", platform: .model3, link: false, twin: true),
-        GameInfo(id: "spikeout", title: "Spikeout", detail: "1998", platform: .model3, link: false),
-        GameInfo(id: "spikeofe", title: "Spikeout", detail: "1999, Final Edition", platform: .model3, link: false),
-        GameInfo(id: "vs299a", title: "Virtua Striker 2 '99", detail: "1999 (two players: a second controller)", platform: .model3, link: false),
-        GameInfo(id: "swtrilgy", title: "Star Wars Trilogy Arcade", detail: "1998 (the left stick flies)", platform: .model3, link: false, flight: true),
-        GameInfo(id: "lostwsga", title: "The Lost World", detail: "1997 (light gun: mouse or touch)", platform: .model3, link: false, analogGun: true),
-        GameInfo(id: "lamachin", title: "L.A. Machineguns", detail: "1998 (light gun: mouse or touch)", platform: .model3, link: false, analogGun: true),
-        GameInfo(id: "oceanhuna", title: "The Ocean Hunter", detail: "1998 (light gun: mouse or touch; two coins per credit)", platform: .model3, link: false, analogGun: true),
-        GameInfo(id: "bassdx", title: "Sega Bass Fishing", detail: "1998, Deluxe, USA (the left stick is the rod, the right trigger reels, X casts)", platform: .model3, link: false),
-        GameInfo(id: "getbass", title: "Get Bass", detail: "1998, Japan, Standard (the left stick is the rod, the right trigger reels, X casts)", platform: .model3, link: false),
-        GameInfo(id: "getbassur", title: "Get Bass", detail: "1998, Japan, Upright (the left stick is the rod, the right trigger reels, X casts)", platform: .model3, link: false),
-        GameInfo(id: "getbassdx", title: "Get Bass", detail: "1998, Japan, Deluxe (needs bassdx.zip beside it; the left stick is the rod, the right trigger reels, X casts; two coins per credit)", platform: .model3, link: false),
-        GameInfo(id: "magtruck", title: "Magical Truck Adventure", detail: "1998, Japan (pump the lever: the stick up and down; X the pedal; two players: a second controller)", platform: .model3, link: false),
-        GameInfo(id: "hotd4a", title: "The House of the Dead 4", detail: "2005, Revision A (light gun: mouse or touch; middle-click, G, X or three fingers throw a grenade; the game folder that holds disk0)", platform: .lindbergh, link: false),
-        GameInfo(id: "letsgoju", title: "Let's Go Jungle!", detail: "2006, Lost on the Island of Spice (light gun: mouse or touch, hold to fire; the game folder that holds disk0)", platform: .lindbergh, link: false),
-        GameInfo(id: "segartv", title: "Sega Race TV", detail: "2008 (wheel and pedals; the game folder that holds disk0)", platform: .lindbergh, link: false),
-        GameInfo(id: "outr2sdx", title: "OutRun 2 SP SDX", detail: "2006 (wheel and pedals; the game folder that holds disk0)", platform: .lindbergh, link: false),
-        GameInfo(id: "outrun", title: "Out Run", detail: "1986, Revision B (Out Run board; the shift buttons move the gear lever: low and high)", platform: .classic2d, link: false),
-        GameInfo(id: "shangon", title: "Super Hang-On", detail: "1987, sit-down/upright (Out Run board; the right shoulder is the turbo)", platform: .classic2d, link: false),
-        GameInfo(id: "aburner2", title: "After Burner II", detail: "1987 (X Board; the left stick flies, the right trigger is the throttle)", platform: .classic2d, link: false, flight: true),
-        GameInfo(id: "thndrbld", title: "Thunder Blade", detail: "1987, upright (X Board; the left stick flies, the right trigger is the throttle)", platform: .classic2d, link: false, flight: true),
-    ]
+    /// The platform filter's choices: the platforms with a game in `all`, so
+    /// a platform whose games are all hidden for this release has no tab.
+    static let platforms: [Platform] = Platform.allCases.filter { p in all.contains { $0.platform == p } }
 }
 
 /// One card in the library: a game on one platform, with its versions
@@ -218,7 +164,7 @@ struct ArcadeGame: Identifiable, Hashable {
 /// ones, once, at launch. iCloud Drive files and ROM server files under the
 /// old names are still found (Storage.otherNames).
 enum SetRenames {
-    static let renamed = ["hotd4": "hotd4a", "lgj": "letsgoju", "or2sp": "outr2sdx"]
+    static let renamed = GameNames.renamed // games.toml's renamed_from
 
     static func migrate() {
         let fm = FileManager.default
@@ -272,15 +218,26 @@ enum Storage {
     /// cabinet mounts it (the folder that holds disk0), named after its set
     /// ("hotd4a"). In iCloud Drive and on the ROM server they are one file,
     /// <set>.tar (GamePackage), unpacked into the folder before play.
+    /// A Chihiro game is a folder too: the one that holds its XBE ("vcop3",
+    /// holding vc3.xbe), and travels the same way.
     static func isFolder(_ romset: String) -> Bool {
-        GameInfo.all.first { $0.id == romset }?.platform == .lindbergh
+        let platform = GameInfo.all.first { $0.id == romset }?.platform
+        return platform == .lindbergh || platform == .chihiro
+    }
+
+    /// A folder game that travels as <set>.tar (iCloud Drive, the ROM server): every one (Lindbergh, Chihiro).
+    static func isPacked(_ romset: String) -> Bool { isFolder(romset) }
+
+    /// What a game folder holds that marks it as the game's: disk0, or the Chihiro game's XBE.
+    static func folderMark(_ romset: String) -> String {
+        GameNames.chihiroXbe[romset] ?? "disk0"
     }
 
     /// The ROM set the user added for `romset`, if any.
     static func rom(_ romset: String) -> URL? {
         if isFolder(romset) {
             let url = roms.appendingPathComponent(romset, isDirectory: true)
-            return FileManager.default.fileExists(atPath: url.appendingPathComponent("disk0").path) ? url : nil
+            return FileManager.default.fileExists(atPath: url.appendingPathComponent(folderMark(romset)).path) ? url : nil
         }
         // Over Rev's split .zip lacks its parent's files: the .7z (the whole set) first.
         for ext in romset == "overrevb" ? Array(romExtensions.reversed()) : romExtensions {
@@ -291,12 +248,12 @@ enum Storage {
     }
 
     /// Other names a set's file may have, and the app's set they are
-    /// (scripts/rom_index.py's OTHER_NAMES): MAME parents that hold a clone's
+    /// (scripts/game_sets.py's OTHER_NAMES): MAME parents that hold a clone's
     /// set (hotd.7z with The House of the Dead's original set, hotdo; doa.zip
     /// with Dead or Alive's Revision B, doab, in older romsets) and the names
     /// the app gave the Lindbergh games before it took MAME's (or2sp.tar is
     /// outr2sdx; see SetRenames).
-    static let otherNames = ["hotd": "hotdo", "doa": "doab", "or2sp": "outr2sdx", "lgj": "letsgoju", "hotd4": "hotd4a"]
+    static let otherNames = GameNames.otherNames // games.toml's other_names and renamed_from
 
     /// The app's set and the other names its files may have.
     static func names(_ romset: String) -> [String] {
@@ -304,8 +261,14 @@ enum Storage {
     }
 
     /// MAME device sets a game's set needs beside it (Wing War's I/O board
-    /// BIOS, model1io2.zip), added like a game's ROM set.
-    static let devices = ["wingwar": ["model1io2"]]
+    /// BIOS, model1io2.zip), added like a game's ROM set (games.toml's devices).
+    static let devices = GameNames.devices
+
+    /// A board's MAME BIOS set its games use when it is there, added like a
+    /// ROM set: Chihiro's chihiro.zip, whose EEPROM dumps the core reads from
+    /// beside the game (the ROM folder). Without it the game starts with
+    /// fresh operator settings, so unlike `devices` it is never required.
+    static let biosSets: [Platform: String] = [.chihiro: "chihiro"]
 
     /// The set a ROM file is for ("srallyc.7z" is srallyc), if Arcade Foundry: Insert Coin
     /// knows it (a game's, or a device set one needs).
@@ -318,9 +281,10 @@ enum Storage {
         let ext = url.pathExtension.lowercased()
         var set = url.deletingPathExtension().lastPathComponent.lowercased()
         if let app = otherNames[set] { set = app }
-        if ext == GamePackage.ext { return isFolder(set) ? set : nil }
+        if ext == GamePackage.ext { return isPacked(set) ? set : nil }
         guard romExtensions.contains(ext),
-              GameInfo.all.contains(where: { $0.id == set }) || devices.values.contains(where: { $0.contains(set) }) else { return nil }
+              GameInfo.all.contains(where: { $0.id == set }) || devices.values.contains(where: { $0.contains(set) })
+                || biosSets.values.contains(set) else { return nil }
         return set
     }
 
@@ -336,7 +300,7 @@ enum Storage {
         if isFolder(set) && source.hasDirectoryPath {
             // Played here, and packed into iCloud Drive for the other devices.
             try await Task.detached(priority: .userInitiated) { try installFolder(source, set: set) }.value
-            if let cloud { try await packToCloud(set, into: cloud) }
+            if let cloud, isPacked(set) { try await packToCloud(set, into: cloud) }
             return set
         }
         if isFolder(set) && cloud == nil {
@@ -365,9 +329,15 @@ enum Storage {
     /// the one in iCloud Drive, downloaded first if needed.
     @MainActor static func ready(_ romset: String) async throws -> URL {
         let url: URL
+        let localTar = roms.appendingPathComponent("\(romset).\(GamePackage.ext)")
         if let local = rom(romset) {
             url = local
-        } else if let item = CloudROMs.shared.items[romset], isFolder(romset) {
+        } else if isPacked(romset), FileManager.default.fileExists(atPath: localTar.path) {
+            // <set>.tar put in the ROM folder by hand (the Files app, devicectl): unpacked on first play.
+            try await Task.detached(priority: .userInitiated) { try GamePackage.unpack(file: localTar, set: romset) }.value
+            guard let local = rom(romset) else { throw CoreError.failed("\(romset).\(GamePackage.ext) did not unpack") }
+            url = local
+        } else if let item = CloudROMs.shared.items[romset], isPacked(romset) {
             // <set>.tar: unpacked here, then only the game folder is kept on this device.
             let tar = try await CloudROMs.download(item.url)
             try await Task.detached(priority: .userInitiated) { try GamePackage.unpack(file: tar, set: romset) }.value
@@ -380,7 +350,18 @@ enum Storage {
             throw CoreError.failed("There is no ROM set for \(romset) on this device or in iCloud Drive.")
         }
         for device in devices[romset] ?? [] { try await place(device, beside: url) }
+        await placeBIOS(for: romset)
         return url
+    }
+
+    /// The board's BIOS set (biosSets) in the ROM folder, from iCloud Drive
+    /// if it is only there; nothing when it is nowhere (it is optional).
+    @MainActor private static func placeBIOS(for romset: String) async {
+        guard let platform = GameInfo.all.first(where: { $0.id == romset })?.platform,
+              let bios = biosSets[platform], rom(bios) == nil,
+              let item = CloudROMs.shared.items[bios],
+              let file = try? await CloudROMs.download(item.url) else { return }
+        try? install(file, set: bios, ext: file.pathExtension.lowercased(), move: false)
     }
 
     /// A device set where the core looks for it: beside the game's set.
@@ -401,7 +382,7 @@ enum Storage {
     /// again takes minutes).
     static func moveToCloud(_ romset: String, folder: URL) async throws {
         if isFolder(romset) {
-            if rom(romset) != nil { try await packToCloud(romset, into: folder) }
+            if isPacked(romset), rom(romset) != nil { try await packToCloud(romset, into: folder) }
             return
         }
         guard let url = rom(romset) else { return }
@@ -430,14 +411,15 @@ enum Storage {
         if move { try fm.moveItem(at: file, to: dst) } else { try fm.copyItem(at: file, to: dst) }
     }
 
-    /// Copies a Lindbergh game folder into the ROM folder as <set>/
+    /// Copies a Lindbergh or Chihiro game folder into the ROM folder as <set>/
     /// (a clone, not a copy, on the same APFS volume).
     static func installFolder(_ source: URL, set: String) throws {
         let fm = FileManager.default
         let scoped = source.startAccessingSecurityScopedResource()
         defer { if scoped { source.stopAccessingSecurityScopedResource() } }
-        guard fm.fileExists(atPath: source.appendingPathComponent("disk0").path) else {
-            throw CoreError.failed("\(source.lastPathComponent) has no disk0 folder: pick the game folder that holds disk0")
+        let mark = folderMark(set)
+        guard fm.fileExists(atPath: source.appendingPathComponent(mark).path) else {
+            throw CoreError.failed("\(source.lastPathComponent) has no \(mark): pick the game folder that holds \(mark)")
         }
         try fm.createDirectory(at: roms, withIntermediateDirectories: true)
         let dst = roms.appendingPathComponent(set, isDirectory: true)
@@ -503,6 +485,7 @@ enum RomServer {
                 for name in names {
                     do {
                         try await PackageDownload.run(base.appendingPathComponent("\(name).\(GamePackage.ext)"), set: romset)
+                        await check(romset) // the core's file list, when it has one
                         return
                     } catch let error as URLError where unreachable(error) {
                         throw error
@@ -525,6 +508,11 @@ enum RomServer {
                     for device in Storage.devices[romset] ?? [] where Storage.rom(device) == nil {
                         try await download(device, from: server) // its device sets too
                     }
+                    if let platform = GameInfo.all.first(where: { $0.id == romset })?.platform,
+                       let bios = Storage.biosSets[platform], Storage.rom(bios) == nil {
+                        try? await download(bios, from: server) // the board's BIOS set, when the server has it
+                    }
+                    await check(romset)
                     return
                 } catch let error as URLError where unreachable(error) {
                     throw error // the next name would wait as long
@@ -536,6 +524,15 @@ enum RomServer {
         } catch let error as URLError where unreachable(error) {
             throw Unreachable(errorDescription: "Could not reach the ROM server at \(base.absoluteString) (\(error.localizedDescription))." + localNetworkHint)
         }
+    }
+
+    /// Has the game's core check the downloaded set (every file, its size and
+    /// CRC against the core's own list); the result shows in Downloads.
+    private static func check(_ romset: String) async {
+        guard let url = Storage.rom(romset), let core = await MainActor.run(body: { CoreLibrary.load(romset) }) else { return }
+        await MainActor.run { Downloads.shared.startCheck(romset) }
+        let result = await Task.detached(priority: .utility) { core.checkRoms(url) }.value
+        await MainActor.run { Downloads.shared.finishCheck(romset, result) }
     }
 
     private static func unreachable(_ error: URLError) -> Bool {

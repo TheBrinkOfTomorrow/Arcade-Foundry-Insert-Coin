@@ -14,12 +14,12 @@ configFiles:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "1.0.1" # x.y.z, the same as linux/CMakeLists.txt
+    MARKETING_VERSION: "1.2.0" # x.y.z, the same as linux/CMakeLists.txt
     CURRENT_PROJECT_VERSION: "1"
     PRODUCT_NAME: Arcade Foundry Insert Coin # the .app file name: no colon allowed, the display name below has it
     PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID) # Signing.xcconfig, or yours in Local.xcconfig
     SWIFT_OBJC_BRIDGING_HEADER: InsertCoin/Core/Bridging.h
-    HEADER_SEARCH_PATHS: $(SRCROOT)/../cores/arcade-foundry-cores-model12/include
+    HEADER_SEARCH_PATHS: $(SRCROOT)/../cores/arcade-foundry-cores-common/include
 targetTemplates:
   App:
     type: application

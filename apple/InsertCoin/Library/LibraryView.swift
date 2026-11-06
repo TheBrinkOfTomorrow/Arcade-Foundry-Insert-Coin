@@ -187,7 +187,7 @@ struct LibraryView: View {
             #endif
         }
         // A platform the filter no longer has (Other, removed): All.
-        .onAppear { if platform != "all" && Platform(rawValue: platform) == nil { platform = "all" } }
+        .onAppear { if platform != "all" && !GameInfo.platforms.contains(where: { $0.rawValue == platform }) { platform = "all" } }
         // After this pass draws: the library's first frame (#202).
         .onAppear { DispatchQueue.main.async { LaunchTimer.libraryShown() } }
         .onChange(of: platform) { _ in selected = nil }
@@ -317,7 +317,7 @@ struct LibraryView: View {
     private var platformPicker: some View {
         Picker("Platform", selection: $platform) {
             Text("All").tag("all")
-            ForEach(Platform.allCases) { Text($0.name).tag($0.rawValue) }
+            ForEach(GameInfo.platforms) { Text($0.name).tag($0.rawValue) }
         }
     }
 
@@ -405,11 +405,6 @@ struct LibraryView: View {
         return (game.versions.count > 1 ? "\(ready.count) of \(game.versions.count) versions ready" : "Ready to play", true)
     }
 
-    /// The card's picture: the first version with one.
-    private func pictureSet(_ game: ArcadeGame) -> String {
-        game.versions.first { Pictures.exists($0.id) }?.id ?? game.versions[0].id
-    }
-
     private func subtitle(_ game: ArcadeGame) -> String {
         game.versions.count > 1 ? "\(game.platform.name) · \(game.versions.count) versions"
                                 : "\(game.platform.name) · \(game.versions[0].detail)"
@@ -467,7 +462,7 @@ struct LibraryView: View {
         let s = status(game)
         return NavigationLink(value: game.id) {
             VStack(alignment: .leading, spacing: 10) {
-                GamePicture(romset: pictureSet(game))
+                GamePicture(romset: game.pictureSet)
                 Text(game.title).font(.title3.bold())
                 Text(subtitle(game)).font(.caption).foregroundStyle(.secondary)
                 Spacer(minLength: 8)
@@ -489,7 +484,7 @@ struct LibraryView: View {
         let compact = compactCards
         return Button { open(game) } label: {
             VStack(alignment: .leading, spacing: compact ? 6 : 8) {
-                GamePicture(romset: pictureSet(game))
+                GamePicture(romset: game.pictureSet)
                     .overlay(alignment: .bottomTrailing) {
                         if compact {
                             Image(systemName: s.playable ? "play.fill" : "arrow.down.circle")
@@ -542,7 +537,7 @@ struct LibraryView: View {
         let s = status(game)
         return NavigationLink(value: game.id) {
             HStack(spacing: 12) {
-                GamePicture(romset: pictureSet(game)).frame(width: Self.rowPicture)
+                GamePicture(romset: game.pictureSet).frame(width: Self.rowPicture)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(game.title).font(.headline).lineLimit(1)
                     Text(subtitle(game)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -573,42 +568,43 @@ struct LibraryView: View {
         max(1, Int((width - 48 + 20) / (card + 20)))
     }
 
-    /// The library with a controller on macOS and iOS (Apple TV has focus):
-    /// the d-pad or left stick moves the highlight, A opens the game's page,
+    /// The library with a controller on macOS and iOS (Apple TV has focus),
+    /// or on the Mac a steering wheel: the d-pad or left stick moves the highlight, A opens the game's page,
     /// Menu the app's settings (iOS); X, Y, the shoulders and triggers the
     /// toolbar's choices.
     private func padTick() {
-        let gp = GCController.current?.extendedGamepad ?? GCController.controllers().compactMap(\.extendedGamepad).first
-        let symbols = gp.map { g in
+        let controller = GCController.current?.extendedGamepad ?? GCController.controllers().compactMap(\.extendedGamepad).first
+        let symbols = controller.map { g in
             [g.buttonX, g.buttonY, g.leftShoulder, g.rightShoulder, g.leftTrigger, g.rightTrigger].map { $0.sfSymbolsName ?? "" }
         } ?? []
         if padSymbols != symbols { padSymbols = symbols }
-        guard playing == nil, path.isEmpty, !appSettings, let gp else { return }
+        // The gamepad, or a steering wheel's d-pad and buttons (MenuPad).
+        guard playing == nil, path.isEmpty, !appSettings, let gp = MenuPad.read() else { return }
         if !pad.armed {
-            pad.armed = !gp.buttonA.isPressed && !gp.buttonB.isPressed && !gp.buttonMenu.isPressed
+            pad.armed = !gp.a && !gp.b && !gp.menu
             return
         }
-        let x = gp.dpad.xAxis.value + gp.leftThumbstick.xAxis.value
-        let y = gp.dpad.yAxis.value + gp.leftThumbstick.yAxis.value
+        let x = gp.moveX
+        let y = gp.moveY
         var move = 0
         if x > 0.5 { move = 1 } else if x < -0.5 { move = -1 } else if y > 0.5 { move = listView ? -1 : -gridColumns } else if y < -0.5 { move = listView ? 1 : gridColumns }
         let games = shown
         if pad.repeats(move), !games.isEmpty {
             selected = selected.map { min(max(0, $0 + move), games.count - 1) } ?? 0
         }
-        if pad.pressed("a", gp.buttonA.isPressed), let i = selected, i < games.count {
+        if pad.pressed("a", gp.a), let i = selected, i < games.count {
             pad.armed = false // the page waits for A to be let go
             path.append(games[i].id)
         }
         // The toolbar's choices, which a controller cannot reach (#184).
-        if pad.pressed("x", gp.buttonX.isPressed) { listView.toggle() }
-        if pad.pressed("y", gp.buttonY.isPressed) { playableOnly.toggle() }
-        if pad.pressed("r1", gp.rightShoulder.isPressed) { platform = Self.nextPlatform(after: platform) }
-        if pad.pressed("l1", gp.leftShoulder.isPressed) { platform = Self.nextPlatform(after: platform, by: -1) }
-        if pad.pressed("r2", gp.rightTrigger.isPressed) { sort = Self.nextSort(after: sort) }
-        if pad.pressed("l2", gp.leftTrigger.isPressed) { sort = Self.nextSort(after: sort, by: -1) }
+        if pad.pressed("x", gp.buttonX) { listView.toggle() }
+        if pad.pressed("y", gp.buttonY) { playableOnly.toggle() }
+        if pad.pressed("r1", gp.r1) { platform = Self.nextPlatform(after: platform) }
+        if pad.pressed("l1", gp.l1) { platform = Self.nextPlatform(after: platform, by: -1) }
+        if pad.pressed("r2", gp.r2) { sort = Self.nextSort(after: sort) }
+        if pad.pressed("l2", gp.l2) { sort = Self.nextSort(after: sort, by: -1) }
         #if os(iOS)
-        if pad.pressed("menu", gp.buttonMenu.isPressed) { appSettings = true }
+        if pad.pressed("menu", gp.menu) { appSettings = true }
         #endif
     }
 
@@ -623,7 +619,7 @@ struct LibraryView: View {
 
     /// The platform filter's next (or previous) choice, round to All again.
     private static func nextPlatform(after platform: String, by step: Int = 1) -> String {
-        let all = ["all"] + Platform.allCases.map(\.rawValue)
+        let all = ["all"] + GameInfo.platforms.map(\.rawValue)
         return all[((all.firstIndex(of: platform) ?? 0) + step + all.count) % all.count]
     }
 
@@ -636,13 +632,14 @@ struct LibraryView: View {
     private func downloadMissing() async {
         let games = missing
         guard !romServer.isEmpty, !games.isEmpty, downloading == nil else { return }
-        var got: [String] = [], failed: [String] = []
+        var got: [String] = [], failed: [String] = [], bad: [String] = []
         var unreachable: String?
         for game in games {
             downloading = game.id
             do {
                 try await RomServer.download(game.id, from: romServer)
                 got.append(game.id)
+                if let problem = downloads.problem(game.id) { bad.append("\(game.id) (\(problem))") }
             } catch let error as RomServer.Unreachable {
                 unreachable = error.localizedDescription
                 break
@@ -654,9 +651,39 @@ struct LibraryView: View {
         refresh += 1
         var parts: [String] = []
         if !got.isEmpty { parts.append("Downloaded \(got.joined(separator: ", ")).") }
+        if !bad.isEmpty { parts.append("Failed the ROM check (a bad dump or another version): \(bad.joined(separator: "; ")).") }
         if !failed.isEmpty { parts.append("Not on the ROM server: \(failed.joined(separator: ", ")).") }
         if let unreachable { parts.append(unreachable) }
         message = parts.joined(separator: " ")
+    }
+}
+
+/// The region a game runs as, for the cores that offer it (CoreLibrary.regions):
+/// the Lindbergh games keep Japan in their settings and have no menu for it.
+struct RegionPicker: View {
+    let regions: [String]
+    @AppStorage private var region: String
+
+    init(romset: String, regions: [String]) {
+        self.regions = regions
+        _region = AppStorage(wrappedValue: regions[0], SettingKey.region(romset))
+    }
+
+    var body: some View {
+        Picker("Region", selection: $region) {
+            ForEach(regions, id: \.self) { Text(Self.name($0)).tag($0) }
+        }
+        Text("The game's language follows it. From the next start.")
+            .font(.caption).foregroundStyle(.secondary)
+    }
+
+    static func name(_ region: String) -> String {
+        switch region {
+        case "export": return "Export (English)"
+        case "usa": return "USA"
+        case "japan": return "Japan"
+        default: return region.capitalized
+        }
     }
 }
 
@@ -664,7 +691,7 @@ struct LibraryView: View {
 struct CrosshairToggle: View {
     @AppStorage private var on: Bool
 
-    init(romset: String) { _on = AppStorage(wrappedValue: true, SettingKey.crosshair(romset)) }
+    init(game: GameInfo) { _on = AppStorage(wrappedValue: game.crosshairByDefault, SettingKey.crosshair(game.id)) }
 
     var body: some View {
         Toggle("Show the crosshair", isOn: $on)
@@ -672,6 +699,44 @@ struct CrosshairToggle: View {
             .font(.caption).foregroundStyle(.secondary)
     }
 }
+
+#if os(iOS)
+/// A game's on-screen controller (#359): its own choice or the global one,
+/// and for a gun game whether it aims by touch.
+struct TouchControlsSection: View {
+    let game: GameInfo
+    @AppStorage private var own: String
+    @AppStorage private var aimByTouch: Bool
+    @AppStorage(SettingKey.touchControls) private var global = TouchControls.automatic
+
+    init(game: GameInfo) {
+        self.game = game
+        _own = AppStorage(wrappedValue: "", SettingKey.gameTouchControls(game.id))
+        _aimByTouch = AppStorage(wrappedValue: true, SettingKey.aimByTouch(game.id))
+    }
+
+    var body: some View {
+        Section("On-screen controller") {
+            if game.aimsGun {
+                Picker("Aim with", selection: $aimByTouch) {
+                    Text("Touch").tag(true)
+                    Text("On-screen controller").tag(false)
+                }
+                Text(aimByTouch
+                     ? "One finger aims and fires where it touches, a second reloads\(game.gunButton ? ", a third throws" : ""). No on-screen controller."
+                     : "The stick moves the crosshair, A fires, B reloads\(game.gunButton ? ", X throws" : "").")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if !game.aimsGun || !aimByTouch {
+                Picker("On-screen controller", selection: $own) {
+                    Text("Use the global setting (\(global.name))").tag("")
+                    ForEach(TouchControls.allCases) { Text($0.name).tag($0.rawValue) }
+                }
+            }
+        }
+    }
+}
+#endif
 
 /// The game's controller layout (ButtonMap): each action and the button
 /// that does it. Choosing one waits for the controller button to use
@@ -686,7 +751,7 @@ struct ControllerMapSection: View {
 
     var body: some View {
         Section("Controller") {
-            if game.showsCrosshair { CrosshairToggle(romset: game.id) }
+            if game.showsCrosshair { CrosshairToggle(game: game) }
             ForEach(ButtonMap.actions(for: game)) { item in
                 Button {
                     listening = listening == item.button ? nil : item.button
@@ -731,22 +796,42 @@ struct ControllerMapSection: View {
     }
 }
 
-/// A game's picture (Pictures), filling a 4:3 frame; a placeholder until
-/// it has one.
+/// A game's picture (Pictures.card: the player's own, the downloaded art,
+/// or the app's screen from the game), filling a 4:3 frame; a placeholder
+/// until it has one. Asks for the art the first time it is drawn (GameArt).
 struct GamePicture: View {
     let romset: String
+    @ObservedObject private var art = GameArt.shared
 
     var body: some View {
         Color.black
             .aspectRatio(4.0 / 3.0, contentMode: .fit)
             .overlay {
-                if let image = Pictures.image(romset) {
-                    Image(decorative: image, scale: 1).resizable().scaledToFill()
+                if let image = Pictures.card(romset) {
+                    // A screen fills the frame; a flyer (portrait) is shown whole.
+                    let screenShaped = (1.2...1.5).contains(Double(image.width) / Double(max(image.height, 1)))
+                    Image(decorative: image, scale: 1).resizable()
+                        .aspectRatio(contentMode: screenShaped ? .fill : .fit)
                 } else {
                     Image(systemName: "gamecontroller").font(.largeTitle).foregroundStyle(.secondary)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 8))
+            .onAppear { art.wantCard(romset) }
+    }
+}
+
+extension ArcadeGame {
+    /// The card's picture: the first version with the player's own, else
+    /// with a downloaded screen, else with a screen from the game, else
+    /// with a flyer, else the first.
+    @MainActor var pictureSet: String {
+        let art = GameArt.shared
+        return (versions.first { Pictures.hasOwn($0.id) }
+            ?? versions.first { art.has($0.id, .title) || art.has($0.id, .ingame) }
+            ?? versions.first { GameArt.noMAMEScreens.contains($0.id) && art.has($0.id, .flyer) }
+            ?? versions.first { Pictures.exists($0.id) }
+            ?? versions.first { art.has($0.id, .flyer) })?.id ?? versions[0].id
     }
 }
 
@@ -842,7 +927,9 @@ struct GameOptionsSections: View {
         #endif
         Section("Picture") {
             GamePicture(romset: game.id).frame(maxWidth: 320).id(pictureChanged)
-            Text("Taken from the game after half a minute of play, or with \"Use this screen as the picture\" in the pause menu.")
+            Text(Pictures.hasOwn(game.id)
+                 ? "Your own picture, shown instead of the game art."
+                 : "The game's title screen when it has downloaded (Settings, Game art), else a screen taken after \(Int(Pictures.screenAfter(game.platform))) seconds of play, else the flyer. \"Use this screen as the picture\" in the pause menu makes your own.")
                 .font(.caption).foregroundStyle(.secondary)
             #if !os(tvOS)
             Button("Choose an image…") { choosingPicture = true }
@@ -855,24 +942,35 @@ struct GameOptionsSections: View {
                     }
                 }
             #endif
-            if Pictures.exists(game.id) {
-                Button("Remove the picture (the game takes a new one)", role: .destructive) {
-                    Pictures.remove(game.id)
+            if Pictures.hasOwn(game.id) {
+                Button("Remove your picture (back to the game art)", role: .destructive) {
+                    Pictures.removeOwn(game.id)
                     pictureChanged += 1
                 }
+            } else if Pictures.cardIsScreen(game.id) {
+                Button("Remove the screen from the game", role: .destructive) {
+                    Pictures.removeScreen(game.id)
+                    pictureChanged += 1
+                }
+                Text("The next play takes another, after \(Int(Pictures.screenAfter(game.platform))) seconds.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         GameScreenSection(romset: game.id)
         if let core = CoreLibrary.load(game.id) {
             Section("Core") {
                 LabeledContent("Version", value: core.version)
+                if !core.regions.isEmpty { RegionPicker(romset: game.id, regions: core.regions) }
             }
         }
+        #if os(iOS)
+        TouchControlsSection(game: game)
+        #endif
         ControllerMapSection(game: game)
         Section("ROM set") {
             if Storage.rom(game.id) != nil {
                 Text("On this device")
-                if let folder = cloud.folder {
+                if let folder = cloud.folder, !Storage.isFolder(game.id) || Storage.isPacked(game.id) {
                     Button(Storage.isFolder(game.id) ? "Copy to iCloud Drive (for your other devices)" : "Put in iCloud Drive (shared with your other devices)") {
                         run { try await Storage.moveToCloud(game.id, folder: folder) }
                     }

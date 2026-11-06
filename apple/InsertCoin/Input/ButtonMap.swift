@@ -102,8 +102,12 @@ struct ButtonMap: Equatable {
             return [Action(.a, "Fire"), Action(.rightTrigger, "Fire"), Action(.b, "Reload")] + coinStart
         case "hotd4a": // the gun's button throws a grenade
             return [Action(.a, "Fire"), Action(.rightTrigger, "Fire"), Action(.b, "Reload"), Action(.x, "Grenade")] + coinStart
-        case "gunblade", "rchase2", "lamachin", "oceanhuna", "letsgoju": // no reload: hold to fire
+        case "gunblade", "rchase2", "lamachin", "oceanhuna", "letsgoju", "jpark", "rchase": // no reload: hold to fire
             return [Action(.a, "Fire"), Action(.rightTrigger, "Fire")] + coinStart
+        case "ga2": // the three buttons (punch, kick, guard in the fighting layout); the third casts magic
+            return [Action(.x, "Button 1"), Action(.a, "Button 2"), Action(.b, "Magic")] + coinStart
+        case "sonic": // the trackball rolls with the stick or d-pad; its one button (punch, kick or button 2) spin jumps
+            return [Action(.x, "Spin jump"), Action(.a, "Spin jump"), Action(.y, "Spin jump")] + coinStart
         case "doab": // the fighting buttons: punch, kick, then guard holds
             return [Action(.x, "Punch"), Action(.a, "Kick"), Action(.b, "Hold")] + coinStart
         case "vf2", "fvipers", "vf", "lastbrnx", "schamp", "fvipers2":
@@ -161,11 +165,35 @@ struct ButtonMap: Equatable {
         case "outr2sdx": // view 1 is its view change; the shift buttons move the gear lever (high and low)
             return [Action(.rightTrigger, "Accelerate"), Action(.leftTrigger, "Brake"), Action(.rightShoulder, "Gear up"), Action(.leftShoulder, "Gear down"),
                     Action(.a, "View change")] + coinStart
+        case "pdrift": // the shift buttons move the gear lever (low and high)
+            return [Action(.rightTrigger, "Accelerate"), Action(.leftTrigger, "Brake"), Action(.rightShoulder, "High gear"),
+                    Action(.leftShoulder, "Low gear")] + coinStart
         case "outrun": // the shift buttons move the gear lever (low and high)
             return [Action(.rightTrigger, "Accelerate"), Action(.leftTrigger, "Brake"), Action(.rightShoulder, "High gear"),
                     Action(.leftShoulder, "Low gear")] + coinStart
-        case "shangon": // the supercharger (turbo) button: TRIGGER1 or SHIFT_UP
-            return [Action(.rightTrigger, "Throttle"), Action(.leftTrigger, "Brake"), Action(.rightShoulder, "Turbo")] + coinStart
+        case "loffire": // the turret's trigger and missile button; B fires where the gun last aimed
+            return [Action(.a, "Fire"), Action(.rightTrigger, "Fire"), Action(.x, "Missile")] + coinStart
+        case "smgp": // the shift lever's two switches (up and down)
+            return [Action(.rightTrigger, "Accelerate"), Action(.leftTrigger, "Brake"), Action(.rightShoulder, "Shift up"),
+                    Action(.leftShoulder, "Shift down")] + coinStart
+        case "gprider": // throttle grip, brake lever and the shift pedal's two switches
+            return [Action(.rightTrigger, "Throttle"), Action(.leftTrigger, "Brake"), Action(.rightShoulder, "Shift up"),
+                    Action(.leftShoulder, "Shift down")] + coinStart
+        case "hangon", "rachero", "enduror": // throttle grip and brake lever
+            return [Action(.rightTrigger, "Throttle"), Action(.leftTrigger, "Brake")] + coinStart
+        case "shangon": // the supercharger (turbo) button: SHIFT_UP or VIEW1
+            return [Action(.rightTrigger, "Throttle"), Action(.leftTrigger, "Brake"), Action(.rightShoulder, "Turbo"), Action(.a, "Turbo")] + coinStart
+        case "toutrun", "radr": // the shift buttons move the gear lever (low and high); Turbo Out Run's turbo is VIEW1
+            return [Action(.rightTrigger, "Accelerate"), Action(.leftTrigger, "Brake"), Action(.rightShoulder, "High gear"),
+                    Action(.leftShoulder, "Low gear")] + (game.id == "toutrun" ? [Action(.a, "Turbo")] : []) + coinStart
+        case "radm": // the light and wiper switches (views 1 and 2); no gears
+            return [Action(.rightTrigger, "Accelerate"), Action(.leftTrigger, "Brake"), Action(.a, "Lights"), Action(.b, "Wiper")] + coinStart
+        case "f1en": // gear up and down buttons (manual transmission)
+            return [Action(.rightTrigger, "Accelerate"), Action(.leftTrigger, "Brake"), Action(.rightShoulder, "Shift up"),
+                    Action(.leftShoulder, "Shift down")] + coinStart
+        case "orunners": // shift up and down; the radio's music buttons on views 1-3
+            return [Action(.rightTrigger, "Accelerate"), Action(.leftTrigger, "Brake"), Action(.rightShoulder, "Shift up"),
+                    Action(.leftShoulder, "Shift down"), Action(.a, "Music select"), Action(.b, "Music back"), Action(.x, "Music forward")] + coinStart
         case "dirtdvls", "ecau": // one view change button (view 1)
             return [Action(.rightTrigger, "Accelerate"), Action(.leftTrigger, "Brake"), Action(.rightShoulder, "Shift up"), Action(.leftShoulder, "Shift down"),
                     Action(.a, "View change")] + coinStart
@@ -180,6 +208,20 @@ struct ButtonMap: Equatable {
             if game.id == "wingwar" {
                 return [Action(.a, "Machine gun"), Action(.rightShoulder, "Machine gun"), Action(.b, "Missile"), Action(.x, "Smoke"),
                         Action(.y, "Change view"), Action(.rightTrigger, "Throttle")] + coinStart
+            }
+            if game.id == "sharrier" { // one fire button on the stick
+                return [Action(.a, "Fire"), Action(.rightShoulder, "Fire")] + coinStart
+            }
+            if game.id == "aburner131" { // the stick's two buttons; no throttle lever
+                return [Action(.a, "Vulcan"), Action(.rightShoulder, "Vulcan"), Action(.b, "Missile")] + coinStart
+            }
+            if game.id == "gforce2" { // the stick's two buttons: shoot and missile
+                return [Action(.a, "Shoot"), Action(.rightShoulder, "Shoot"), Action(.b, "Missile"),
+                        Action(.rightTrigger, "Throttle")] + coinStart
+            }
+            if game.id == "gloc" || game.id == "strkfgtr" { // the stick's three buttons: vulcan, missile and after burner
+                return [Action(.a, "Vulcan"), Action(.rightShoulder, "Vulcan"), Action(.b, "Missile"), Action(.x, "After burner"),
+                        Action(.rightTrigger, "Throttle")] + coinStart
             }
             if game.id == "aburner2" || game.id == "thndrbld" { // the stick's two buttons: vulcan and missile
                 return [Action(.a, "Vulcan"), Action(.rightShoulder, "Vulcan"), Action(.b, "Missile"),

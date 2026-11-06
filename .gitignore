@@ -8,3 +8,4 @@ DerivedData/
 .DS_Store
 apple/InsertCoin/Support/Info-*.plist
 apple/Local.xcconfig
+__pycache__/

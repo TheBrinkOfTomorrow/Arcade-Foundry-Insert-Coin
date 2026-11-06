@@ -14,3 +14,8 @@
 	path = cores/arcade-foundry-cores-classic2d
 	url = https://github.com/TheBrinkOfTomorrow/Arcade-Foundry-Cores-Classic2D
 	branch = main
+[submodule "cores/arcade-foundry-cores-common"]
+	path = cores/arcade-foundry-cores-common
+	url = https://github.com/TheBrinkOfTomorrow/Arcade-Foundry-Cores-Common
+	branch = main
+	branch = main

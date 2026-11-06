@@ -1,0 +1,363 @@
+# The games the app lists, in the library's order (a card's versions in
+# this order), one [[game]] per ROM set. The facts about each game (title,
+# year, board, controls) come from its core's games.toml; this file has the
+# words the app shows. scripts/gen_games.py writes Catalog's game list, the
+# Linux app's, build_cores.py's lists and GAMES.md's tables from both (CI
+# checks they match). Keys: cores/arcade-foundry-cores-common/tools/games/afgames.py (APP_KEYS).
+# In a hint, {W} {S} {E} {N} are the face buttons (X A B Y on Apple
+# devices, West South East North on Linux).
+
+[[game]]
+set = "daytona93"
+
+[[game]]
+set = "daytona"
+doc_title = "Daytona USA (Revision A)"
+
+[[game]]
+set = "srallyc"
+
+[[game]]
+set = "manxttc"
+
+[[game]]
+set = "motoraid"
+hint = "{W} punch, {S} kick"
+
+[[game]]
+set = "doab"
+hint = "{W} punch, {S} kick, {E} hold"
+
+[[game]]
+set = "lastbrnx"
+hint = "{W} punch, {S} kick, {E} guard"
+
+[[game]]
+set = "schamp"
+hint = "{W} punch, {S} kick, {E} barrier"
+
+[[game]]
+set = "dynabb97"
+hint = "{W} and {S} the buttons, {E} swings the bat"
+
+[[game]]
+set = "waverunr"
+hint = "the right trigger is the throttle lever"
+
+[[game]]
+set = "bel"
+hint = "{W} the missile"
+
+[[game]]
+set = "topskatr"
+hint = "the left stick curves and slides, {S} and {E} jump, the shoulders select"
+
+[[game]]
+set = "skisuprg"
+hint = "{S}, {E} and {W} select, the shoulders zoom, the stick swings"
+
+[[game]]
+set = "segawski"
+hint = "Start is set, {W} and {E} the pitch buttons, the d-pad selects"
+
+[[game]]
+set = "desert"
+hint = "right shoulder machine gun, left shoulder cannon, {S}/{E}/{W} VR1-3, {N} shift"
+
+[[game]]
+set = "skytargt"
+hint = "the left stick flies, {S} machine gun, {E} missile, {W} view change"
+
+[[game]]
+set = "dynamcop"
+hint = "{W} punch, {S} kick, {E} jump"
+
+[[game]]
+set = "vcop2"
+
+[[game]]
+set = "vcop"
+
+[[game]]
+set = "vf2"
+
+[[game]]
+set = "indy500"
+
+[[game]]
+set = "fvipers"
+
+[[game]]
+set = "sgt24h"
+
+[[game]]
+set = "overrevb"
+
+[[game]]
+set = "stcc"
+
+[[game]]
+set = "vstriker"
+hint = "{W} long pass, {S} shoot, {E} short pass"
+
+[[game]]
+set = "zerogun"
+hint = "{W} shot, {S} special"
+
+[[game]]
+set = "pltkids"
+hint = "{W} shot, {S} special"
+
+[[game]]
+set = "rchase2"
+
+[[game]]
+set = "gunblade"
+
+[[game]]
+set = "hotdo"
+
+[[game]]
+set = "von"
+
+[[game]]
+set = "vr"
+
+[[game]]
+set = "swa"
+hint = "the left stick flies"
+
+[[game]]
+set = "vf"
+
+[[game]]
+set = "wingwar"
+hint = "the left stick flies"
+
+[[game]]
+set = "vf3"
+
+[[game]]
+set = "scud"
+
+[[game]]
+set = "scudplus"
+doc_title = "Scud Race Plus"
+
+[[game]]
+set = "daytona2"
+doc_title = "Daytona USA 2: Battle on the Edge"
+
+[[game]]
+set = "dayto2pe"
+doc_title = "Daytona USA 2 Power Edition"
+
+[[game]]
+set = "srally2"
+hint = "{S} view change, {E} hand brake"
+
+[[game]]
+set = "lemans24"
+
+[[game]]
+set = "dirtdvls"
+hint = "{S} view change"
+
+[[game]]
+set = "harley"
+hint = "{S} view change, {E} music select; two coins per credit"
+
+[[game]]
+set = "ecau"
+hint = "{S} view change"
+
+[[game]]
+set = "fvipers2"
+hint = "{W} punch, {S} kick, {E} guard"
+
+[[game]]
+set = "von2"
+hint = "two coins per credit"
+
+[[game]]
+set = "spikeout"
+hint = "{W} beat, {S} charge, {E} shift, {N} jump"
+
+[[game]]
+set = "spikeofe"
+hint = "{W} beat, {S} charge, {E} shift, {N} jump"
+doc_title = "Spikeout Final Edition"
+
+[[game]]
+set = "vs299a"
+hint = "{W} short pass, {S} long pass, {E} shoot"
+
+[[game]]
+set = "swtrilgy"
+hint = "the left stick flies, left shoulder second trigger, {E}/{W} event buttons"
+
+[[game]]
+set = "lostwsga"
+hint = "right button reloads"
+
+[[game]]
+set = "lamachin"
+
+[[game]]
+set = "oceanhuna"
+hint = "two coins per credit"
+
+[[game]]
+set = "bassdx"
+hint = "the left stick is the rod, the right trigger reels, the d-pad the lure stick, {W} casts, {S} selects"
+
+[[game]]
+set = "getbass"
+hint = "the left stick is the rod, the right trigger reels, {W} casts"
+
+[[game]]
+set = "getbassur"
+hint = "the left stick is the rod, the right trigger reels, {W} casts"
+
+[[game]]
+set = "getbassdx"
+hint = "needs bassdx.zip beside it; the left stick is the rod, the right trigger reels, {W} casts; two coins per credit"
+
+[[game]]
+set = "magtruck"
+hint = "pump the lever: the stick up and down; {W} the pedal"
+
+[[game]]
+set = "hotd4a"
+hint = "middle-click, G, {W} or three fingers throw a grenade"
+linux_hint = "middle-click, G or {W} throws a grenade"
+
+[[game]]
+set = "letsgoju"
+hint = "hold to fire"
+doc_title = "Let's Go Jungle! Lost on the Island of Spice"
+
+[[game]]
+set = "segartv"
+hint = "wheel and pedals"
+
+[[game]]
+set = "outr2sdx"
+hint = "wheel and pedals"
+
+[[game]]
+set = "outrun"
+hint = "the shoulders move the gear lever: low and high"
+
+[[game]]
+set = "shangon"
+hint = "the right shoulder or {S} is the turbo"
+
+[[game]]
+set = "aburner131"
+hint = "the left stick flies; {S} or the right shoulder fires the vulcan, {E} the missiles"
+
+[[game]]
+set = "aburner2"
+hint = "the left stick flies, the right trigger is the throttle; {S} or the right shoulder fires the vulcan, {E} the missiles"
+
+[[game]]
+set = "rachero"
+hint = "lean with the left stick; the right trigger is the throttle, the left the brake"
+
+[[game]]
+set = "loffire"
+hint = "two gun turrets, {W} fires a missile"
+linux_hint = "two gun turrets; middle-click, G or {W} fires a missile"
+doc_note = "On its first start the game asks to calibrate the guns: fire, then aim at the top left corner and fire, then the bottom right and fire, for each gun"
+
+[[game]]
+set = "gprider"
+hint = "lean with the left stick; the right trigger is the throttle, the left the brake, the shoulders shift up and down"
+
+[[game]]
+set = "smgp"
+hint = "steer with the left stick; the right trigger accelerates, the left brakes, the shoulders shift up and down"
+
+[[game]]
+set = "thndrbld"
+hint = "the left stick flies, the right trigger is the throttle; {S} or the right shoulder fires the guns, {E} the missiles"
+
+[[game]]
+set = "toutrun"
+hint = "the shoulders move the gear lever: low and high; {S} is the turbo"
+
+[[game]]
+set = "orunners"
+hint = "the shoulders shift; {S}, {E} and {W} choose the music"
+
+[[game]]
+set = "hangon"
+hint = "lean with the left stick; the right trigger is the throttle, the left the brake"
+
+[[game]]
+set = "sharrier"
+hint = "the left stick flies; {S} or the right shoulder fires"
+
+[[game]]
+set = "enduror"
+hint = "steer with the left stick and pull it back for a wheelie; the right trigger is the throttle, the left the brake"
+
+[[game]]
+set = "radr"
+hint = "the shoulders move the gear lever: low and high"
+
+[[game]]
+set = "radm"
+hint = "{S} the lights, {E} the wiper"
+
+[[game]]
+set = "f1en"
+hint = "steer to pick automatic or manual and press the gas; with manual the shoulders shift up and down"
+
+[[game]]
+set = "jpark"
+hint = "the game draws each gun's sight"
+
+[[game]]
+set = "sonic"
+hint = "the stick or d-pad rolls the trackball; {W} or {S} spin jumps"
+
+[[game]]
+set = "ga2"
+hint = "{W} {S} {E} the three buttons; {E} casts magic"
+
+[[game]]
+set = "gforce2"
+hint = "the left stick flies, the right trigger is the throttle; {S} or the right shoulder fires, {E} the missiles"
+
+[[game]]
+set = "pdrift"
+hint = "steer with the left stick; the right trigger accelerates, the left brakes; the shoulders move the gear lever: low and high"
+
+[[game]]
+set = "gloc"
+hint = "the left stick flies, the right trigger is the throttle; {S} or the right shoulder fires the vulcan, {E} the missiles, {W} the after burner"
+
+[[game]]
+set = "strkfgtr"
+hint = "the left stick flies, the right trigger is the throttle; {S} or the right shoulder fires the vulcan, {E} the missiles, {W} the after burner"
+
+[[game]]
+set = "rchase"
+hint = "two guns on the rail cars; the game draws each gun's sight"
+
+[[game]]
+set = "hotd3"
+hidden = true
+
+[[game]]
+set = "vcop3"
+hidden = true
+hint = "middle-click, G, {W} or three fingers changes weapon"
+linux_hint = "middle-click, G or {W} changes weapon"
+
+[[game]]
+set = "crtaxihr"
+hidden = true
+hint = "steer with the left stick; the right trigger accelerates, the left brakes; the right shoulder is Drive, the left Reverse"

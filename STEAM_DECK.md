@@ -45,7 +45,7 @@ contains no ROM data, and this guide won't tell you where to find any.
 - Keep the Deck plugged in while it builds.
 
 Which games play on Linux, and so on the Deck: every classic 2D (Out Run
-board, X Board), Model 1, Model 2 and Model 3 game in [GAMES.md](GAMES.md),
+board, X Board, System 32, Hang-On board), Model 1, Model 2 and Model 3 game in [GAMES.md](GAMES.md),
 and from Lindbergh, **The House of
 the Dead 4** (`hotd4a`) and **OutRun 2 SP SDX** (`outr2sdx`). Let's Go
 Jungle! and Sega Race TV aren't in the 1.0.0 release yet.
@@ -87,7 +87,7 @@ Inside the box, install the build tools (one long command):
         libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev \
         libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev libdecor-0-dev \
         libdrm-dev libgbm-dev libegl-dev libgl1-mesa-dev libglu1-mesa-dev \
-        libdbus-1-dev libudev-dev libsdl2-dev libsdl2-net-dev
+        libdbus-1-dev libudev-dev libsdl2-dev libsdl2-net-dev libcurl4-openssl-dev
 
 `sudo` inside the box doesn't ask for a password, and it only changes the
 box, not SteamOS.
@@ -103,11 +103,11 @@ Still inside the box:
 `--recursive` also fetches the game cores (Model 1/2, Model 3 and
 Lindbergh), which live in their own repositories.
 
-If you'll play Lindbergh games, the Lindbergh build needs two Python
-packages. Install them into the venv the build looks for:
+If you'll play Lindbergh games, the Lindbergh build needs a few Python
+packages. They go in one virtual environment, `~/venvs/afic`, that the
+build looks for (nothing is installed into the box's own Python):
 
-    python3 -m venv cores/arcade-foundry-cores-lindbergh/venv
-    cores/arcade-foundry-cores-lindbergh/venv/bin/pip install capstone pyelftools
+    cores/arcade-foundry-cores-common/tools/afic-venv/setup.sh
 
 ## 4. Put your ROM sets on the Deck
 
@@ -131,8 +131,11 @@ Inside it, make a folder per arcade board, and put each set straight into
 its board's folder, one file per set:
 
     ArcadeFoundry/
-      OutRun/      outrun.zip  shangon.zip
-      XBoard/      aburner2.zip  thndrbld.zip
+      OutRun/      outrun.zip  shangon.zip  toutrun.zip
+      System32/    orunners.zip  radr.zip  radm.zip  f1en.zip  jpark.zip  sonic.zip  ga2.zip
+      HangOn/      hangon.zip  sharrier.zip  enduror.zip
+      XBoard/      aburner131.zip  aburner2.zip  thndrbld.zip  rachero.zip  smgp.zip  loffire.zip  gprider.zip
+      YBoard/      gforce2.zip  pdrift.zip  gloc.zip  strkfgtr.zip  rchase.zip
       Model1/      vr.zip  swa.zip  vf.zip  wingwar.zip  model1io2.zip
       Model2/      daytona.zip  srallyc.zip  vcop.zip  hotdo.zip ...
       Model3/      vf3.zip  scud.zip  daytona2.zip  srally2.zip ...
@@ -173,7 +176,7 @@ either way:
 
       tar -cf hotd4a.tar hotd4a
 
-  The app's `scripts/pack_lindbergh.py --roms <folder>` does the same for
+  The app's `scripts/pack_games.py --roms <folder>` does the same for
   every Lindbergh game in a ROM folder.
 - **As the game folder**, named after the set:
   `Lindbergh/hotd4a/disk0/...`.
@@ -303,6 +306,9 @@ The app sees the Deck as a standard gamepad. Its buttons map like this:
   played), and Y shows all games or only the ones you can play. The app
   remembers all three.
 - X shows the credits.
+- Menu opens Settings: every game's screen settings, full screen, the
+  speed readout, the game thread, and About with the credits. Up/Down
+  choose, Left/Right or A change, B goes back.
 - On a game's page, A on a version plays it. Right on a version folds out
   that version's settings (Shape, Effect, Controller buttons, and the
   crosshair in gun games); Left or B folds them back. The page also lists
@@ -400,7 +406,8 @@ hides it: press Ctrl+H to show hidden folders):
 | Folder | What's in it |
 | --- | --- |
 | `saves/<set>/` | Each game's saves: its settings, link role and records |
-| `pictures/` | The library pictures |
+| `pictures/` | The library pictures (your own in `pictures/own/`) |
+| `art/<set>/` | Downloaded game art (Settings > Game art removes it) |
 | `buttons/<set>` | Each game's controller buttons |
 | `crosshair/<set>` | A game's crosshair, when you turned it off |
 | `games/` | Unpacked Lindbergh games |
@@ -432,8 +439,8 @@ Check, in this order:
 **Let's Go Jungle! or Sega Race TV doesn't show up.** They aren't in the
 1.0.0 release yet.
 
-**The build stops with `No module named 'capstone'`.** The Lindbergh venv
-is missing; make it as in [step 3](#3-get-the-app).
+**The build stops with `No module named 'capstone'`.** The Python venv
+(`~/venvs/afic`) is missing; make it as in [step 3](#3-get-the-app).
 
 **The build runs out of memory or the Deck freezes while building.** Run
 it again with `--jobs 2`.

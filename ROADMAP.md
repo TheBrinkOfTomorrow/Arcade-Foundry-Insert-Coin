@@ -18,9 +18,11 @@ Support, tested on real hardware, for the controls the cabinets had, not
 only game controllers.
 
 - **Arcade sticks** and button panels.
-- **Steering wheels** and pedals, such as the Logitech GT Force, with force
-  feedback where the game had it.
+- **Steering wheels** and pedals: more wheels than the Logitech Driving
+  Force GT (which works on Linux and the Mac now), the Logitech G29 next, and
+  force feedback where the game had it.
 - **Light guns**, such as the Sinden Lightgun, and others.
+- **Tilt to steer** on iPhone and iPad, as a setting.
 - **Unique controllers**: the fishing rod, Magical Truck Adventure's lever,
   skis and the like.
 - **Motion seat rigs.**: maybe, but a long way off
@@ -42,19 +44,43 @@ Play the games in full, immersive 3D.
 - **Linux beyond x86-64**:
 -   ARM64 SBCs (Pi 4/5) - planned for next major release
 -   Radxa Dragon and/or Orion, RISC-V SBCs (pending hardware aviailability)
+- **Windows.** The desktop front end and the Model 1, Model 2 and Classic 2D
+  cores already compile with Clang on Windows, so this is mostly packaging and
+  testing, plus a Windows OpenGL context for Model 3. Lindbergh games need a
+  different graphics path first (their NVIDIA shader extension has no
+  Windows driver support outside NVIDIA's own), so they would come later.
+- **Lindbergh games on Apple TV**, on the Apple TV 4K third generation and
+  later, once their Metal graphics are done.
 - **Android.** maybe.
 
 ## More games
 
 - **The full catalog of Lindbergh games.**
+- **Sega Chihiro games**: Virtua Cop 3, The House of the Dead III and Crazy
+  Taxi High Roller first. They are in the app already but left out of this
+  release while their last problems are fixed.
 - **Other Sega arcade boards.**
+- **Sega's early-1980s Turbo hardware**: Turbo, Subroc-3D and Buck Rogers:
+  Planet of Zoom.
+- **The last four Model 2 games**: Power Sled, Air Walkers, Royal Ascot II
+  and Hanguk Pro Yagu 98. MAME can't run any of them yet, so each needs
+  extra work first.
 - **Arcade boards from other makers.**
 - The remaining games on the boards already supported.
 
 ## Speed and polish
 
+- Saves backed up and synced on Linux, as iCloud does on Apple devices:
+  Dropbox, Google Drive or your own home server (to be investigated).
+- **Metal graphics for the Lindbergh games** on Mac, iPhone and iPad,
+  replacing the OpenGL path they use today.
+- **Game art in the library**: flyers and title screens downloaded on your
+  device the first time a game is shown, instead of only screenshots.
 - A recompiler for the Model 3's PowerPC, so Model 3 games run faster,
   above all on iPhone, iPad and Apple TV.
+- **Sturdier link play**: linked cabinets check that they belong to the same
+  game, and a cabinet that stops answering drops the link instead of
+  freezing the others.
 - ideas and bug reports are welcome as GitHub issues.
 
 ## Helping

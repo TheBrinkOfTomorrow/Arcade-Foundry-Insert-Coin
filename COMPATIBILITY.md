@@ -40,6 +40,7 @@ it's added.
 | Microsoft Xbox Wireless Controller (Xbox One, Bluetooth model) | Bluetooth | ✅ | ✅ | ✅ | |
 | Logitech G F310 Gamepad | Wired USB | ✅ | | | ✅ |
 | Logitech G F710 Wireless Gamepad | 2.4 GHz USB receiver | | | | ✅ |
+| Logitech Driving Force GT (wheel and pedals) | Wired USB | ✅ | | | ✅ |
 
 ## 1.0.0
 

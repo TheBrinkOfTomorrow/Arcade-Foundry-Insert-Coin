@@ -52,6 +52,8 @@ import simd
 /// (steer and stick_y), the right trigger reels, the left trigger is the
 /// line's tension, the d-pad the lure stick, X casts and A selects.
 final class Controls {
+    /// A driving game (GameControls.drive): a steering wheel steers it (Wheel, macOS).
+    var drive = false
     /// The game is flown, not driven (GameInfo.flight).
     var flight = false
     /// Two levers, not a wheel (GameInfo.twin).
@@ -116,21 +118,29 @@ final class Controls {
         GCController.current?.extendedGamepad ?? GCController.controllers().compactMap(\.extendedGamepad).first
     }
 
-    enum MenuCommand { case up, down, select, close }
+    enum MenuCommand { case up, down, left, right, select, close, clear }
 
-    /// The pause menu's input: up/down, A or Return choose, B, Escape or
-    /// Options and Menu close it (Apple TV: also the Siri Remote, GameView
+    /// The pause menu's input: up/down (left/right and X or Delete for the
+    /// Wheel and pedals screen), A or Return choose, B, Escape or
+    /// Options and Menu close it (a wheel's d-pad and buttons count as a
+    /// gamepad's, and its pause button closes it) (Apple TV: also the Siri Remote, GameView
     /// keeps the controller from tvOS's focus while the menu is open too).
     func menuCommands() -> [MenuCommand] {
-        var up = false, down = false, select = false, back = false, toggle = false
-        if let pad {
-            let y = pad.dpad.yAxis.value + pad.leftThumbstick.yAxis.value
-            up = y > 0.5
-            down = y < -0.5
-            select = pad.buttonA.isPressed
-            back = pad.buttonB.isPressed
-            toggle = pad.buttonMenu.isPressed && pad.buttonOptions?.isPressed == true
+        var up = false, down = false, left = false, right = false
+        var select = false, back = false, clear = false, toggle = false
+        if let pad = MenuPad.read() { // a gamepad, or on the Mac a wheel's d-pad and buttons
+            up = pad.moveY > 0.5
+            down = pad.moveY < -0.5
+            left = pad.moveX < -0.5
+            right = pad.moveX > 0.5
+            select = pad.a
+            back = pad.b
+            clear = pad.buttonX
+            toggle = pad.menu && pad.options
         }
+        #if os(macOS)
+        toggle = toggle || Wheel.shared.state().held.contains(.pause) // the wheel's pause button closes it too
+        #endif
         #if os(tvOS)
         // The Siri Remote: swipe or press up and down, click to choose, Menu (Back) closes.
         for remote in GCController.controllers() where remote.extendedGamepad == nil {
@@ -145,14 +155,20 @@ final class Controls {
             func key(_ k: GCKeyCode) -> Bool { kb.button(forKeyCode: k)?.isPressed ?? false }
             up = up || key(.upArrow)
             down = down || key(.downArrow)
+            left = left || key(.leftArrow)
+            right = right || key(.rightArrow)
             select = select || key(.returnOrEnter) || key(.spacebar)
+            clear = clear || key(.deleteOrBackspace)
             toggle = toggle || key(.escape)
         }
         #endif
         var out: [MenuCommand] = []
         if pressed("m.up", up) { out.append(.up) }
         if pressed("m.down", down) { out.append(.down) }
+        if pressed("m.left", left) { out.append(.left) }
+        if pressed("m.right", right) { out.append(.right) }
         if pressed("m.select", select) { out.append(.select) }
+        if pressed("m.clear", clear) { out.append(.clear) }
         if pressed("m.back", back) { out.append(.close) }
         if pressed("pause", toggle) { out.append(.close) } // the same control opened it
         return out
@@ -179,30 +195,126 @@ final class Controls {
     var pointerReload = false
     var pointerGrenade = false
 
-    #if os(iOS)
-    /// On-screen controls when no controller is connected: stick to steer,
-    /// triggers for the pedals, shoulders to shift, A and B for the views;
-    /// for Virtua Fighter 2 the stick and X, A, B (punch, kick, guard);
-    /// Bass Fishing the stick, triggers, X (cast), A and B. Every layout
-    /// has A and B, which operator mode needs as TEST and SERVICE.
-    private var virtualPad: GCVirtualController?
+    /// Touch on the game's picture is the gun (iPhone and iPad): set in the
+    /// gun games while they aim by touch (#359). Elsewhere a touch on the
+    /// picture does nothing.
+    var touchAims = false
 
-    func showTouchControls(_ show: Bool, fighting: Bool = false, fishing: Bool = false) {
-        if show && virtualPad == nil && GCController.controllers().allSatisfy({ $0.extendedGamepad == nil }) {
+    #if os(iOS)
+    /// The on-screen controller's buttons for a kind of game. Every layout
+    /// has A and B, which operator mode needs as TEST and SERVICE.
+    enum TouchLayout {
+        /// The driving games (#362): the stick steers; on the right A is the
+        /// gas, B the brake, X and Y shift down and up, and the right
+        /// shoulder steps through the views (Apple places the triggers and
+        /// left shoulder beside the stick, under the steering thumb).
+        case drive
+        /// The flying games and the rest: stick, triggers, shoulders, A and B.
+        case standard
+        /// Virtua Fighter: the stick and X, A, B, Y (punch, kick, guard, escape).
+        case fighting
+        /// Bass Fishing: the stick (rod), triggers (reel, tension), X (cast), A and B.
+        case fishing
+        /// Virtual-On and Oratorio Tangram: both sticks (levers), triggers (shots), shoulders (dashes).
+        case twin
+        /// A gun game aimed by the controller: the stick moves the
+        /// crosshair, A fires, B reloads, X throws (HotD4's grenade).
+        case gun(button: Bool)
+
+        var elements: Set<String> {
+            switch self {
+            case .drive: [GCInputLeftThumbstick, GCInputButtonA, GCInputButtonB, GCInputButtonX, GCInputButtonY,
+                          GCInputRightShoulder]
+            case .standard: [GCInputLeftThumbstick, GCInputRightTrigger, GCInputLeftTrigger,
+                             GCInputRightShoulder, GCInputLeftShoulder, GCInputButtonA, GCInputButtonB]
+            case .fighting: [GCInputLeftThumbstick, GCInputButtonX, GCInputButtonA, GCInputButtonB, GCInputButtonY]
+            case .fishing: [GCInputLeftThumbstick, GCInputRightTrigger, GCInputLeftTrigger, GCInputButtonX, GCInputButtonA, GCInputButtonB]
+            case .twin: [GCInputLeftThumbstick, GCInputRightThumbstick, GCInputLeftTrigger, GCInputRightTrigger,
+                         GCInputLeftShoulder, GCInputRightShoulder, GCInputButtonA, GCInputButtonB]
+            case .gun(let button): button ? [GCInputLeftThumbstick, GCInputButtonA, GCInputButtonB, GCInputButtonX]
+                : [GCInputLeftThumbstick, GCInputButtonA, GCInputButtonB]
+            }
+        }
+    }
+
+    private var virtualPad: GCVirtualController?
+    private var touchMode = TouchControls.off
+    private var touchLayout: TouchLayout?
+    private var watchers: [NSObjectProtocol] = []
+
+    /// The on-screen controller for a game (nil: none, the gun games aimed
+    /// by touch), shown as the mode says: Automatic follows controllers
+    /// connecting and disconnecting during the game.
+    func startTouchControls(_ mode: TouchControls, layout: TouchLayout?) {
+        stopTouchControls()
+        touchMode = mode
+        touchLayout = layout
+        guard layout != nil, mode == .automatic else { updateTouchControls(); return }
+        for name in [NSNotification.Name.GCControllerDidConnect, .GCControllerDidDisconnect] {
+            watchers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                self?.updateTouchControls()
+            })
+        }
+        updateTouchControls()
+    }
+
+    /// The game is over: the on-screen controller goes.
+    func stopTouchControls() {
+        for w in watchers { NotificationCenter.default.removeObserver(w) }
+        watchers.removeAll()
+        touchLayout = nil
+        updateTouchControls()
+    }
+
+    /// A real controller (not the on-screen one) is connected. Apple's
+    /// on-screen controller names itself "Apple Touch Controller", which
+    /// also covers the moment before `controller` is set.
+    private var realController: Bool {
+        GCController.controllers().contains {
+            $0 !== virtualPad?.controller && $0.vendorName != "Apple Touch Controller" && $0.extendedGamepad != nil
+        }
+    }
+
+    private func updateTouchControls() {
+        let show: Bool
+        switch touchMode {
+        case .always: show = touchLayout != nil
+        case .automatic: show = touchLayout != nil && !realController
+        case .off: show = false
+        }
+        if show, virtualPad == nil, let layout = touchLayout {
             let cfg = GCVirtualController.Configuration()
-            cfg.elements = fighting ? [GCInputLeftThumbstick, GCInputButtonX, GCInputButtonA, GCInputButtonB, GCInputButtonY]
-                : fishing ? [GCInputLeftThumbstick, GCInputRightTrigger, GCInputLeftTrigger, GCInputButtonX, GCInputButtonA, GCInputButtonB]
-                : [GCInputLeftThumbstick, GCInputRightTrigger, GCInputLeftTrigger,
-                   GCInputRightShoulder, GCInputLeftShoulder, GCInputButtonA, GCInputButtonB]
+            cfg.elements = layout.elements
             let pad = GCVirtualController(configuration: cfg)
+            virtualPad = pad // before connect(): its own DidConnect must not count as a controller
             pad.connect()
-            virtualPad = pad
         } else if !show, let pad = virtualPad {
-            pad.disconnect()
             virtualPad = nil
+            pad.disconnect()
         }
     }
     #endif
+
+    /// This pad is the on-screen controller showing the driving layout.
+    private func touchDriving(_ pad: GCExtendedGamepad) -> Bool {
+        #if os(iOS)
+        if case .drive = touchLayout, let touch = virtualPad?.controller?.extendedGamepad { return pad === touch }
+        #endif
+        return false
+    }
+
+    /// The connected controllers in player order: the real ones in the
+    /// order they connected, then the on-screen controller (player 2 when
+    /// it is shown beside a controller, Always).
+    private var pads: [GCExtendedGamepad] {
+        #if os(iOS)
+        if let touch = virtualPad?.controller {
+            let real = GCController.controllers().filter { $0 !== touch }
+            return (real + [touch]).compactMap(\.extendedGamepad)
+        }
+        #endif
+        return GCController.controllers().compactMap(\.extendedGamepad)
+    }
 
     /// The fighting games' buttons and joystick from one controller (Escape
     /// is Virtua Fighter 3's).
@@ -235,7 +347,7 @@ final class Controls {
 
         // With two controllers each is a player, in the order they connected:
         // the one used last (GCController.current) would make both player 1.
-        let pads = GCController.controllers().compactMap(\.extendedGamepad)
+        let pads = self.pads
         let first: GCExtendedGamepad? = pads.count > 1 ? pads[0] : pad
         let second: GCExtendedGamepad? = pads.count > 1 ? pads[1] : nil
         secondGun = second != nil
@@ -246,7 +358,22 @@ final class Controls {
             buttons |= UInt32(AFCORE_START2)
             secondJoined = true
         }
-        if let pad = first {
+        if let pad = first, touchDriving(pad) {
+            // The driving layout on the on-screen controller (#362); the views
+            // are sent as in the flying games (view, viewFrames).
+            target = pad.leftThumbstick.xAxis.value
+            accel = pad.buttonA.isPressed ? 1 : 0
+            brake = pad.buttonB.isPressed ? 1 : 0
+            up = pad.buttonY.isPressed
+            down = pad.buttonX.isPressed
+            let next = pad.rightShoulder.isPressed
+            if next && !viewHeld { view = view % 4 + 1; viewFrames = 6 }
+            viewHeld = next
+            if viewFrames > 0 {
+                viewFrames -= 1
+                buttons |= [UInt32(AFCORE_VIEW1), UInt32(AFCORE_VIEW2), UInt32(AFCORE_VIEW3), UInt32(AFCORE_VIEW4)][view - 1]
+            }
+        } else if let pad = first {
             target = pad.leftThumbstick.xAxis.value
             if abs(pad.dpad.xAxis.value) > 0.5 { target = pad.dpad.xAxis.value }
             accel = map.value(.rightTrigger, pad)
@@ -304,6 +431,30 @@ final class Controls {
             if key(.downArrow) { buttons |= UInt32(AFCORE_DOWN) }
             if l { buttons |= UInt32(AFCORE_LEFT) }
             if r { buttons |= UInt32(AFCORE_RIGHT) }
+        }
+        #endif
+        #if os(macOS)
+        // A steering wheel (Wheel): in the driving games it steers when turned
+        // past the gamepad's stick, its pedals add to the triggers and its
+        // shifter, paddles and buttons to the rest. Coin, start and the pause
+        // menu work in every game.
+        let wheel = Wheel.shared.state()
+        if wheel.connected {
+            if drive && !flight && !twin {
+                if abs(wheel.steer) >= abs(target) { target = wheel.steer }
+                accel = max(accel, wheel.gas)
+                brake = max(brake, wheel.brake)
+                up = up || wheel.held.contains(.shiftUp) || wheel.held.contains(.paddleUp)
+                down = down || wheel.held.contains(.shiftDown) || wheel.held.contains(.paddleDown)
+                if wheel.held.contains(.view1) { buttons |= UInt32(AFCORE_VIEW1) }
+                if wheel.held.contains(.view2) { buttons |= UInt32(AFCORE_VIEW2) }
+                if wheel.held.contains(.view3) { buttons |= UInt32(AFCORE_VIEW3) }
+                if wheel.held.contains(.view4) { buttons |= UInt32(AFCORE_VIEW4) }
+                if wheel.held.contains(.handbrake) { handbrake = 1 }
+            }
+            coinDown = coinDown || wheel.held.contains(.coin)
+            startDown = startDown || wheel.held.contains(.start)
+            if wheel.held.contains(.pause) { pauseDown = true }
         }
         #endif
         if !keySteer { steer = target }

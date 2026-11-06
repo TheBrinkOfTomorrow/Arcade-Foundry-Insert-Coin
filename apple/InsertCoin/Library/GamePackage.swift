@@ -1,7 +1,7 @@
 import Foundation
 
-/// A Lindbergh game folder as one file: <set>.tar, a plain tar of the
-/// folder that holds disk0, so it can sit in iCloud Drive or on the ROM
+/// A Lindbergh or Chihiro game folder as one file: <set>.tar, a plain tar of the
+/// folder that holds disk0 (or the Chihiro game's XBE), so it can sit in iCloud Drive or on the ROM
 /// server like a ROM set and come down to an iPad or Apple TV. Made with
 /// Add ROM (iCloud Drive on), `scripts/pack_lindbergh.py`, or
 /// `tar -cf hotd4a.tar -C <folder with the games> hotd4a`. Unpacked into
@@ -72,10 +72,11 @@ enum GamePackage {
             try? file?.close()
             file = nil
             let fm = FileManager.default
-            guard remaining == 0, fm.fileExists(atPath: staging.appendingPathComponent("disk0").path) else {
+            let mark = Storage.folderMark(set) // disk0, or a Chihiro game's XBE
+            guard remaining == 0, fm.fileExists(atPath: staging.appendingPathComponent(mark).path) else {
                 try? fm.removeItem(at: staging)
                 throw CoreError.failed(remaining > 0 ? "\(set).\(GamePackage.ext) ended early (the download was cut off?)"
-                                                     : "\(set).\(GamePackage.ext) has no disk0 folder: pack the game folder that holds disk0")
+                                                     : "\(set).\(GamePackage.ext) has no \(mark): pack the game folder that holds \(mark)")
             }
             let dst = Storage.roms.appendingPathComponent(set, isDirectory: true)
             try? fm.removeItem(at: dst)
@@ -243,15 +244,16 @@ enum GamePackage {
 
     // MARK: Packing
 
-    /// Writes the game folder `folder` (the one holding disk0) as a tar at
+    /// Writes the game folder `folder` (the one holding disk0, or a Chihiro game's XBE) as a tar at
     /// `out`, with `set` as its top folder.
     static func pack(_ folder: URL, set: String, to out: URL) throws {
         let fm = FileManager.default
         // the game folder is often a link to where the game was unpacked
         let folder = folder.resolvingSymlinksInPath()
         let root = folder.standardizedFileURL.path
-        guard fm.fileExists(atPath: folder.appendingPathComponent("disk0").path) else {
-            throw CoreError.failed("\(folder.lastPathComponent) has no disk0 folder: pick the game folder that holds disk0")
+        let mark = Storage.folderMark(set)
+        guard fm.fileExists(atPath: folder.appendingPathComponent(mark).path) else {
+            throw CoreError.failed("\(folder.lastPathComponent) has no \(mark): pick the game folder that holds \(mark)")
         }
         fm.createFile(atPath: out.path, contents: nil)
         let handle = try FileHandle(forWritingTo: out)
@@ -366,15 +368,45 @@ private extension String {
 @MainActor final class Downloads: ObservableObject {
     static let shared = Downloads()
     @Published private(set) var fraction: [String: Double] = [:]
+    /// What the core's ROM check found for each set downloaded this session.
+    @Published private(set) var checks: [String: RomCheck] = [:]
+    @Published private(set) var checking: Set<String> = []
 
     func set(_ set: String, _ f: Double?) {
         fraction[set] = f
     }
 
-    /// "Downloading…", with how much when the size is known.
+    func startCheck(_ set: String) {
+        checks[set] = nil
+        checking.insert(set)
+    }
+
+    func finishCheck(_ set: String, _ result: RomCheck?) {
+        checking.remove(set)
+        checks[set] = result
+    }
+
+    /// "Downloading…", with how much when the size is known, then "Checking…".
     func label(_ set: String) -> String {
+        if checking.contains(set) { return "Checking…" }
         guard let f = fraction[set] else { return "Downloading…" }
         return String(format: "Downloading… %.0f%%", f * 100)
+    }
+
+    /// The problem the ROM check found in a downloaded set, if any.
+    func problem(_ set: String) -> String? {
+        if case .bad(let why) = checks[set] { return why }
+        return nil
+    }
+
+    /// What to tell the user once `set` has downloaded.
+    func downloaded(_ set: String) -> String {
+        switch checks[set] {
+        case .good?: return "Downloaded \(set): every file checks out."
+        case .bad(let why)?: return "Downloaded \(set), but it does not match the set the core needs (\(why)). It may be a bad dump or another version: get another copy."
+        case .unchecked(let why)?: return "Downloaded \(set) (not checked: \(why))."
+        case nil: return "Downloaded \(set)."
+        }
     }
 }
 

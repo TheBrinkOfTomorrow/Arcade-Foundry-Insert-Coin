@@ -47,6 +47,16 @@ They also use:
 
 - **[SDL](https://www.libsdl.org)** by Sam Lantinga and the SDL contributors: the Linux app, and the cores on Linux (zlib)
 
+## Game art
+
+The game art the app downloads (title screens, flyers, marquees, cabinets
+and in-game screens) is fetched by your device from:
+
+- **[Arcade Database](https://adb.arcadeitalia.net)** from Arcade Italia (arcadeitalia.net)
+- **[libretro-thumbnails](https://github.com/libretro-thumbnails/libretro-thumbnails)** by the libretro project and its contributors
+
+The art itself belongs to Sega and the other rights holders; none of it comes with the app.
+
 ## Game histories
 
 The game pages' histories are my own summaries, drawn from [Wikipedia](https://en.wikipedia.org) and the other pages each one links to. Thank you to their writers and editors.

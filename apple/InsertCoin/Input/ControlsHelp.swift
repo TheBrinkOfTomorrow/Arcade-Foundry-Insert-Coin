@@ -44,7 +44,7 @@ enum ControlsHelp {
     }
 
     static func lines(for game: GameInfo) -> [Line] {
-        game.flight ? flight : game.twin ? twin : game.gunButton ? gun + grenade : game.aimsGun ? gun : game.fishing ? fishing
+        game.flight ? flight : game.twin ? twin : game.gunButton ? gun + (game.id == "loffire" ? missile : grenade) : game.aimsGun ? gun : game.fishing ? fishing
             : game.fighting ? fighting : driving
     }
 
@@ -71,6 +71,7 @@ enum ControlsHelp {
         Line(control: "Player 2", keyboard: "", controller: "A second controller"),
     ]
     private static let grenade = [Line(control: "Grenade", keyboard: "Middle-click or G", controller: "X")]
+    private static let missile = [Line(control: "Missile", keyboard: "Middle-click or G", controller: "X")]
 
     private static let fighting = [
         Line(control: "Move", keyboard: "Arrows", controller: "Left stick or d-pad"),

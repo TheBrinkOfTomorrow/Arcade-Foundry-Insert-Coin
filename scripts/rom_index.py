@@ -1,10 +1,10 @@
 """The ROM sets in a folder: at its top, or one folder down in a folder per
 board (DIR/Model2/srallyc.zip, DIR/Lindbergh/hotd4a.tar). Used by
-build_cores.py, pack_lindbergh.py and serve_roms.py; the Linux app does the
-same (linux/main.cpp).
+build_cores.py, pack_games.py and serve_roms.py; the Linux app does the
+same (link_roms in linux/library.cpp).
 
-An entry is a <name>.zip, .7z or .tar, or a <name>/ folder holding disk0 (a
-Lindbergh game). In a board folder, a <name>/ folder holding one archive
+An entry is a <name>.zip, .7z or .tar, or a <name>/ folder holding disk0 or an XBE (a
+Lindbergh or Chihiro game). In a board folder, a <name>/ folder holding one archive
 (RingEdge/initd8/Initial D Arcade Stage 8 Infinity.7z) is that archive
 under the folder's name (initd8.7z). Board folders are not searched
 further down. Work folders
@@ -23,8 +23,7 @@ DEPTH = 1  # board folders, one down
 # set. MAME's parents holding a clone's whole set (hotd.7z with hotdo's
 # files, doa.zip with doab's), and the names the app gave the Lindbergh games
 # before it took MAME's (or2sp, lgj, hotd4).
-OTHER_NAMES = {"hotdo": ("hotd",), "doab": ("doa",), "outr2sdx": ("or2sp",), "letsgoju": ("lgj",),
-               "hotd4a": ("hotd4",)}
+from game_sets import OTHER_NAMES  # noqa: E402  (games.toml: MAME parents, older dumps, earlier names)
 
 
 def names(s):
@@ -36,6 +35,14 @@ def work_folder(name):
     """A folder beside the board folders that is not searched."""
     n = name.lower()
     return n in ("working", "temp", "__macosx") or n.startswith(("to-file", "_", "."))
+
+
+def holds_xbe(folder):
+    """A Chihiro game folder: it holds the game's XBE (vcop3/vc3.xbe)."""
+    try:
+        return any(f.lower().endswith(".xbe") for f in os.listdir(folder))
+    except OSError:
+        return False
 
 
 def game_archive(folder, warn):
@@ -61,7 +68,7 @@ def index(roms, warn=True):
             if work_folder(d):
                 continue
             path = os.path.join(top, d)
-            if os.path.isdir(os.path.join(path, "disk0")):
+            if os.path.isdir(os.path.join(path, "disk0")) or holds_xbe(path):
                 found.setdefault(d, []).append((depth, path))
             elif depth < DEPTH:
                 keep.append(d)

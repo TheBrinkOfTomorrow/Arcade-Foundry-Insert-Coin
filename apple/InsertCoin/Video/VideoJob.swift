@@ -124,7 +124,9 @@ struct VideoJob {
         }
 
         // The game's own saves stay as they are: it runs from a copy.
-        let saves = FileManager.default.temporaryDirectory.appendingPathComponent("video-saves-\(romset)", isDirectory: true)
+        // (one per process: two renders of one game at once shared it, and
+        // one of them started in the test menu)
+        let saves = FileManager.default.temporaryDirectory.appendingPathComponent("video-saves-\(romset)-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
         if let replay {
             try Replay.restore(replay.header.saves, to: saves)
         } else {
@@ -138,6 +140,9 @@ struct VideoJob {
         let skipFrames = min(total, Int(skip * hz))
         log("\(game.title) (\(romset)) → \(file.path)")
 
+        // A core whose game runs by the host's clock (Chihiro) follows the
+        // frames instead, so its sound comes out with them at any render speed.
+        if lib.useRenderClock() { log("  render clock: 1/60 s of game time per frame") }
         let core = try GameCore(library: lib, romURL: rom, saveDir: saves)
         let track = try music.map(Self.load)
         let writer = try VideoWriter(url: file, lines: lines, hevc: hevc, squarePixels: game.platform == .lindbergh, sound: sound)
@@ -268,10 +273,10 @@ struct VideoJob {
 
     /// The ROM set on this Mac, or in the iCloud Drive folder (downloaded first).
     static func rom(_ romset: String) -> URL? {
-        if let dir = romDir, Storage.isFolder(romset) { // Lindbergh: the game's folder (<set>/disk0)
+        if let dir = romDir, Storage.isFolder(romset) { // Lindbergh, Chihiro: the game's folder (<set>/disk0, <set>/vc3.xbe)
             for name in Storage.names(romset) {
                 let url = dir.appendingPathComponent(name, isDirectory: true)
-                if FileManager.default.fileExists(atPath: url.appendingPathComponent("disk0").path) { return url }
+                if FileManager.default.fileExists(atPath: url.appendingPathComponent(Storage.folderMark(romset)).path) { return url }
             }
         } else if let dir = romDir {
             for name in Storage.names(romset) {

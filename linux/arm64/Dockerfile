@@ -11,7 +11,8 @@ ARG DEBIAN_FRONTEND=noninteractive
 # SDL2_net (Model 3 cores)
 ARG LIBS="libasound2-dev libpulse-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
     libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libdrm-dev libgbm-dev libegl-dev libgl-dev libgles-dev \
-    libglu1-mesa-dev libwayland-dev libdecor-0-dev libudev-dev libdbus-1-dev zlib1g-dev libsdl2-dev libsdl2-net-dev"
+    libglu1-mesa-dev libwayland-dev libdecor-0-dev libudev-dev libdbus-1-dev zlib1g-dev libsdl2-dev libsdl2-net-dev \
+    libcurl4-openssl-dev"
 RUN set -e; \
     if [ "$(dpkg --print-architecture)" = arm64 ]; then \
         extra="$LIBS"; \

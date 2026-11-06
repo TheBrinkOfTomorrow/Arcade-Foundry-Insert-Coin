@@ -29,15 +29,23 @@ final class GameSession: ObservableObject {
     @Published private(set) var menuOpen = false
     /// The game's controls over the pause menu (Help on the Mac).
     @Published var showControls = false
+    /// Wheel and pedals over the pause menu (macOS: WheelSettingsSection).
+    @Published var showWheel = false
+    #if os(macOS)
+    let wheelPanel = WheelPanelModel()
+    #endif
     @Published var menuIndex = 0
     /// Operator mode: A and B are the cabinet's TEST and SERVICE buttons
     /// (Controls.operatorMode), for test mode where there is no F2/F3.
     @Published private(set) var operatorMode = false
-    enum MenuItem { case resume, operatorMode, picture, record, thread, screen3D, vrView, recentre, quit }
+    enum MenuItem { case resume, operatorMode, picture, record, thread, wheel, screen3D, vrView, recentre, quit }
     var menu: [MenuItem] {
         var items: [MenuItem] = [.resume, .operatorMode, .picture]
         if replay != nil { items.append(.record) }
         items.append(.thread)
+        #if os(macOS)
+        items.append(.wheel)
+        #endif
         if hasStereo { items.append(.screen3D) }
         if StereoBridge.shared.open { items += [.vrView, .recentre] }
         return items + [.quit]
@@ -50,6 +58,7 @@ final class GameSession: ObservableObject {
             case .picture: "Use this screen as the picture"
             case .record: "Record replay: \(recording ? "on" : "off")"
             case .thread: "Game on its own thread: \(threaded ? "on" : "off")"
+            case .wheel: "Wheel and pedals"
             case .screen3D: "3D on this screen: \(screen3D.title)"
             case .vrView: "Headset view: \(StereoBridge.shared.view.title)"
             case .recentre: "Recentre the headset view"
@@ -115,6 +124,7 @@ final class GameSession: ObservableObject {
             try core.startLink(listenPort: link.port, next: link.next, frameSync: link.frameSync)
         }
         audio.volume = Float(volume)
+        controls.drive = game.controls == .drive
         controls.flight = game.flight
         controls.twin = game.twin
         controls.analogGun = game.analogGun
@@ -141,11 +151,20 @@ final class GameSession: ObservableObject {
                     if command == .select || command == .close { showControls = false }
                     continue
                 }
+                if showWheel { // its own rows (WheelPanelModel); B at the top goes back
+                    #if os(macOS)
+                    if !wheelPanel.handle(command) { showWheel = false }
+                    #else
+                    showWheel = false
+                    #endif
+                    continue
+                }
                 switch command {
                 case .up: menuIndex = max(0, menuIndex - 1)
                 case .down: menuIndex = min(menuItems.count - 1, menuIndex + 1)
                 case .select: choose(menuIndex)
                 case .close: closeMenu()
+                case .left, .right, .clear: break
                 }
             }
             return
@@ -254,18 +273,23 @@ final class GameSession: ObservableObject {
         if let link {
             DispatchQueue.main.async { [self] in if status != link { status = link } }
         }
-        // A game without a picture takes one after half a minute (Pictures).
-        if frame == Int(hz * 30) {
-            DispatchQueue.main.async { [self] in if !Pictures.exists(game.id) { savePicture() } }
+        // A game without a picture takes one after half a minute (Pictures),
+        // or two and a half on the slow booting boards.
+        if frame == Int(hz * Pictures.screenAfter(game.platform)) {
+            DispatchQueue.main.async { [self] in if !Pictures.exists(game.id) && !Pictures.hasOwn(game.id) { savePicture(own: false) } }
         }
         return true
     }
 
     /// The core's screen into `backScreen` (under coreLock).
     private func copyScreen() {
-        // A core that gives its screen as a GPU buffer: no copy (a stereo
-        // core's 3D pictures are drawn into backScreen, so not for those).
-        if !hasStereo, let s = core.screenSurface() {
+        // A core that gives its screen as a GPU buffer: no copy (Lindbergh
+        // on iOS, Model 3 with Metal). Not while this screen shows a 3D
+        // picture, which is drawn into backScreen (drawStereo).
+        lock.lock()
+        let flat = coreScreen3D == .off
+        lock.unlock()
+        if flat, let s = core.screenSurface() {
             backSurface = s
             (backWidth, backHeight) = (CVPixelBufferGetWidth(s), CVPixelBufferGetHeight(s))
             return
@@ -384,6 +408,10 @@ final class GameSession: ObservableObject {
         guard menuOpen else { return }
         menuOpen = false
         showControls = false
+        showWheel = false
+        #if os(macOS)
+        wheelPanel.close()
+        #endif
         resume()
     }
 
@@ -396,7 +424,7 @@ final class GameSession: ObservableObject {
             controls.operatorMode = operatorMode
             closeMenu()
         case .picture:
-            savePicture() // the screen under the menu
+            savePicture(own: true) // the screen under the menu, as the player's own
             closeMenu()
         case .record:
             recording.toggle()
@@ -422,12 +450,18 @@ final class GameSession: ObservableObject {
         case .recentre:
             StereoBridge.shared.recentreCount += 1
             closeMenu()
+        case .wheel:
+            #if os(macOS)
+            wheelPanel.open()
+            #endif
+            showWheel = true
         case .quit: exitRequested = true
         }
     }
 
-    /// The game's screen as its picture in the library.
-    private func savePicture() {
+    /// The game's screen as its picture in the library: the player's own
+    /// (the pause menu) or the app's (after half a minute).
+    private func savePicture(own: Bool) {
         lock.lock()
         defer { lock.unlock() }
         guard screenWidth > 0 else { return } // no screen yet
@@ -442,12 +476,12 @@ final class GameSession: ObservableObject {
                 for x in 0..<screenWidth { pixels[y * screenWidth + x] = row[x] | 0xff00_0000 }
             }
             pixels.withUnsafeBufferPointer {
-                Pictures.save(game.id, pixels: $0.baseAddress!, width: screenWidth, height: screenHeight)
+                Pictures.save(game.id, own: own, pixels: $0.baseAddress!, width: screenWidth, height: screenHeight)
             }
             return
         }
         screen.withUnsafeBufferPointer {
-            Pictures.save(game.id, pixels: $0.baseAddress!, width: screenWidth, height: screenHeight)
+            Pictures.save(game.id, own: own, pixels: $0.baseAddress!, width: screenWidth, height: screenHeight)
         }
     }
 
@@ -455,7 +489,9 @@ final class GameSession: ObservableObject {
         paused = true
         lock.lock()
         running = false
+        let ended = quit
         lock.unlock()
+        guard !ended else { return } // stopped: the core is closed
         audio.pause()
         coreLock.lock() // the frame under way, if any, ends first
         core.save()
@@ -484,6 +520,7 @@ final class GameSession: ObservableObject {
         core.save()
         backUp()
         if recording { replay?.save(into: CloudROMs.shared.folder) }
+        core.close() // the next game can start at once (GameCore.close)
     }
 
     /// Backs the saves up to iCloud as this cabinet's (see SaveSync), with

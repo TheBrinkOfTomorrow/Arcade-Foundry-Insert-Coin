@@ -139,7 +139,9 @@ final class GameMTKView: MTKView {
     #elseif os(iOS)
     // One finger aims and fires where it touches; a second finger reloads, a
     // third throws HotD4's grenade instead.
+    // Only in the gun games aimed by touch (Controls.touchAims, #359).
     private func touch(_ event: UIEvent?) {
+        guard controls?.touchAims == true else { return }
         let down = (event?.allTouches ?? []).filter { $0.phase != .ended && $0.phase != .cancelled }
         if let first = down.first(where: { $0.view === self }) {
             let p = first.location(in: self)

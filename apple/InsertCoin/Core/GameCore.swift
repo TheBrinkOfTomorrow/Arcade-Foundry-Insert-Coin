@@ -20,6 +20,41 @@ final class CoreLibrary {
     /// This game's core version, x.y.z.
     var version: String { Self.format(api.pointee.core_version) }
 
+    /// The values the core offers for one of its options (afcore 5.3's
+    /// options, "region=export|usa|japan"), its default first; empty when it
+    /// has no such option.
+    func optionValues(_ name: String) -> [String] {
+        let a = api.pointee
+        guard let at = MemoryLayout<afcore_api>.offset(of: \afcore_api.set_option),
+              Int(a.size) >= at + MemoryLayout<UnsafeRawPointer>.size, let options = a.options else { return [] }
+        for line in String(cString: options).split(separator: "\n") where line.hasPrefix("\(name)=") {
+            return line.dropFirst(name.count + 1).split(separator: "|").map(String.init)
+        }
+        return []
+    }
+
+    /// The regions the core offers, its default first; empty when it has
+    /// none. The language follows the region.
+    var regions: [String] { optionValues("region") }
+
+    /// For a video render (--video), in a core that offers it (clock=frames,
+    /// the Chihiro cores): the game's time moves 1/60 s per frame however
+    /// slowly the render runs, so its sound stays with the picture. For the
+    /// next game it starts; true when the core took it.
+    func useRenderClock() -> Bool {
+        guard optionValues("clock").contains("frames"), let set = api.pointee.set_option else { return false }
+        return set("clock", "frames") == 0
+    }
+
+    /// The region chosen on the game's page (or the core's default) for the
+    /// next game it starts.
+    func applyRegion() {
+        let regions = self.regions
+        guard let first = regions.first, let set = api.pointee.set_option else { return }
+        let chosen = UserDefaults.standard.string(forKey: SettingKey.region(romset)) ?? first
+        _ = set("region", regions.contains(chosen) ? chosen : first)
+    }
+
     /// The core interface this app is built for (include/afcore.h). A core
     /// loads when its major version matches.
     static let interfaceVersion = "\(AFCORE_API_MAJOR).\(AFCORE_API_MINOR).\(AFCORE_API_PATCH)"
@@ -109,6 +144,33 @@ final class CoreLibrary {
     }
 }
 
+/// What a core's check of a ROM set found (afcore check_roms).
+enum RomCheck: Equatable {
+    case good
+    case bad(String)       // the first problem: "epr-16722a.12: wrong CRC"
+    case unchecked(String) // could not check now (a game is running)
+}
+
+extension CoreLibrary {
+    /// Checks the ROM set at `url` against this core's file list (every file,
+    /// its size and CRC, read in full) without starting the game; nil when
+    /// the core cannot check (Lindbergh, Chihiro, a core before 5.2). Takes
+    /// as long as loading the game: call it off the main thread.
+    func checkRoms(_ url: URL) -> RomCheck? {
+        let fns = self.api.pointee
+        guard let at = MemoryLayout<afcore_api>.offset(of: \afcore_api.check_roms),
+              Int(fns.size) >= at + MemoryLayout<UnsafeRawPointer>.size, let check = fns.check_roms else { return nil }
+        var report = [CChar](repeating: 0, count: 512)
+        let result = check(url.path, &report, report.count)
+        let why = String(cString: report)
+        switch result {
+        case 1: return .good
+        case 0: return .bad(why.isEmpty ? "does not match" : why)
+        default: return .unchecked(why)
+        }
+    }
+}
+
 enum CoreError: LocalizedError {
     case failed(String)
     var errorDescription: String? {
@@ -128,13 +190,26 @@ final class GameCore {
         self.library = library
         var err = [CChar](repeating: 0, count: 512)
         try FileManager.default.createDirectory(at: saveDir, withIntermediateDirectories: true)
+        library.applyRegion()
         guard let c = library.api.pointee.create!(romURL.path, saveDir.path, &err, err.count) else {
             throw CoreError.failed(String(cString: err))
         }
         core = c
     }
 
-    deinit { api.destroy!(core) }
+    private var closed = false
+
+    /// Ends the game in the core now, rather than when the last reference
+    /// goes: a core runs one game at a time (Model 3 refuses a second), and
+    /// the views can hold the session a while after it stops. Nothing may
+    /// call the core after this.
+    func close() {
+        guard !closed else { return }
+        closed = true
+        api.destroy!(core)
+    }
+
+    deinit { close() }
 
     func runFrame(_ input: afcore_input) {
         var input = input
@@ -155,7 +230,7 @@ final class GameCore {
     }
 
     /// The screen as an IOSurface-backed BGRA pixel buffer the GPU has
-    /// finished drawing (afcore.h 5.1, a Lindbergh core on iOS), for the view
+    /// finished drawing (afcore.h 5.1: a Lindbergh core on iOS, a Model 3 core), for the view
     /// to show without a copy; nil from a core without it: use screen().
     func screenSurface() -> CVPixelBuffer? {
         let api = library.api.pointee

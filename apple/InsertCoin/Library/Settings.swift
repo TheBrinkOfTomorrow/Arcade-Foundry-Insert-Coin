@@ -16,9 +16,54 @@ enum SettingKey {
     static let lastPlayed = "lastPlayed" // [String: Double]: when each romset was last started (seconds since 1970)
     static let appearance = "appearance" // String: an Appearance (default dark)
     static let recordReplay = "recordReplay" // Bool: every game records a replay (default off; a game's page can differ, ReplayRecorder.key)
+    static let downloadArt = "downloadArt" // Bool: game art downloads by itself (default on; GameArt)
     static let showSpeed = "showSpeed" // Bool: iPhone, iPad and Apple TV show the speed over the game (default off; the Mac shows it in the window title)
-    /// Bool: a gun game shows its crosshair (default on; GameInfo.showsCrosshair)
+    /// Bool: a gun game shows its crosshair (default GameInfo.crosshairByDefault; GameInfo.showsCrosshair)
     static func crosshair(_ romset: String) -> String { "crosshair.\(romset)" }
+    /// String: a TouchControls, when iPhone and iPad show the on-screen
+    /// controller (default automatic); "touchControls.<romset>" a game's
+    /// own (unset: this one)
+    static let touchControls = "touchControls"
+    static func gameTouchControls(_ romset: String) -> String { "touchControls.\(romset)" }
+    /// Bool: a gun game aims by touch (default on) rather than with the
+    /// on-screen controller
+    static func aimByTouch(_ romset: String) -> String { "aimByTouch.\(romset)" }
+    /// String: the region a game's core runs as ("export", "usa", "japan";
+    /// default the core's first, CoreLibrary.regions)
+    static func region(_ romset: String) -> String { "region.\(romset)" }
+}
+
+/// When iPhone and iPad show the on-screen controller (#359).
+enum TouchControls: String, CaseIterable, Identifiable {
+    /// While no controller is connected, following controllers as they come and go.
+    case automatic
+    /// Even with a controller connected (it is then player 2).
+    case always
+    /// Never: a controller, a keyboard or the cabinet buttons only.
+    case off
+    var id: String { rawValue }
+
+    var name: String {
+        switch self {
+        case .automatic: "Automatic"
+        case .always: "Always"
+        case .off: "Off"
+        }
+    }
+
+    static var global: TouchControls {
+        UserDefaults.standard.string(forKey: SettingKey.touchControls).flatMap { TouchControls(rawValue: $0) } ?? .automatic
+    }
+
+    /// A game's own choice, else the global one.
+    static func resolved(_ romset: String) -> TouchControls {
+        UserDefaults.standard.string(forKey: SettingKey.gameTouchControls(romset)).flatMap { TouchControls(rawValue: $0) } ?? global
+    }
+
+    /// A gun game aims by touch unless its page says otherwise.
+    static func aimsByTouch(_ romset: String) -> Bool {
+        UserDefaults.standard.object(forKey: SettingKey.aimByTouch(romset)) as? Bool ?? true
+    }
 }
 
 /// The app's light or dark look. Dark unless the user picks another.

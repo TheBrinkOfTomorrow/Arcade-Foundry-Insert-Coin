@@ -14,10 +14,10 @@ final class VideoCaption {
 
     /// "Sega Model 2B · 1996" from the catalog: the board from the game's
     /// details when they name a revision of it (or a classic 2D board: "Sega
-    /// X Board · 1987"), the year they start with.
+    /// X Board · 1987", "Sega System 32 · 1992"), the year they start with.
     static func subtitle(_ game: GameInfo) -> String {
         var board = "Sega \(game.platform.name)"
-        if let r = game.detail.range(of: #"Model [123][A-C]?\b|Out Run board|X Board"#, options: .regularExpression) { board = "Sega \(game.detail[r])" }
+        if let r = game.detail.range(of: #"Model [123][A-C]?\b|Out Run board|X Board|System 32|Hang-On board"#, options: .regularExpression) { board = "Sega \(game.detail[r])" }
         let year = game.detail.prefix { $0.isNumber }
         return [board, String(year)].filter { !$0.isEmpty }.joined(separator: " · ")
     }

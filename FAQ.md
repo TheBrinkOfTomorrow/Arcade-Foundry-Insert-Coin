@@ -29,10 +29,15 @@ Inside that folder:
   `<set>.unpacking` folder behind, and the next try clears it.
 - `Saves/<romset>/`: each game's saves (its settings, link role and
   records).
-- `Pictures/<romset>.png`: the library pictures.
+- `Pictures/<romset>.png`: the screens the games took of themselves;
+  `Pictures/Own/<romset>.png` your own pictures (the pause menu's "Use this
+  screen as the picture", or an image you chose).
+- `Art/<romset>/`: downloaded game art (on iPhone, iPad and Apple TV in the
+  app's Caches folder, `Arcade Foundry/Art/`, which the system may clear).
 
 On Linux, `roms/` holds the ROM sets, `games/` the unpacked Lindbergh games,
-`saves/<romset>/` the saves, `pictures/` the library pictures and
+`saves/<romset>/` the saves, `pictures/` the library pictures (your own in
+`pictures/own/`), `art/` the downloaded game art and
 `buttons/<romset>` each game's controller buttons.
 
 Settings (the ROM server, screen options, link play) are kept in the app's
@@ -118,13 +123,20 @@ check the address in Settings (`http://<address>:<port>`) and that the
 server is still running. A download gives up after 30 seconds with no data,
 and says why.
 
-### How do Lindbergh games travel?
+### How do Lindbergh and Chihiro games travel?
 
-A Lindbergh game is a folder (the one that holds `disk0`), not a ROM set. To
+A Lindbergh game is a folder (the one that holds `disk0`), and a Chihiro
+game the folder that holds its XBE (`vcop3/vc3.xbe`), not a ROM set. To
 go through iCloud Drive or a ROM server, it is packed as one file,
 `<set>.tar`. Add ROM with iCloud Drive on makes that file for you, and
-`scripts/pack_lindbergh.py` makes one for a ROM server. A device unpacks the
+`scripts/pack_games.py` makes one for a ROM server (from a Chihiro `.7z`
+dump too). A device unpacks the
 file into `ROMs/<set>/` before the first play.
+
+Chihiro games also use MAME's `chihiro.zip` (the board's settings and ID).
+Put it in the ROMs folder, or add it with Add ROM. It is optional: without
+it a game starts from factory settings with a blank board ID, and keeps any
+settings you change in the test menu.
 
 ### Why can't I install a build with Lindbergh games on my iPhone or iPad?
 

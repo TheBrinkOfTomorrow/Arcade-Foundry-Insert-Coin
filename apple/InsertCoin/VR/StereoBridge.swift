@@ -15,7 +15,7 @@ enum VRView: String, CaseIterable {
 
     /// The light-gun games aim at a screen, and their camera swings.
     static func defaultView(for game: GameInfo) -> VRView {
-        ["vcop", "vcop2", "hotdo", "gunblade", "bel", "rchase2", "hotd4a"].contains(game.id) || game.analogGun ? .cabinet : .full
+        game.aimsGun ? .cabinet : .full
     }
 
     static func saved(for game: GameInfo) -> VRView {

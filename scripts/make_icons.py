@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Make the app icons and logo images in apple/InsertCoin/Assets.xcassets from
-the artwork in art/ (needs Pillow and numpy).
+the artwork in art/ (needs Pillow and numpy: run it with ~/venvs/afic/bin/python).
 
 The icon is the AF mark with INSERT COIN under it on dark navy. iPhone/iPad
 get it flat at 1024 px, the Mac at every size inside its rounded square (the

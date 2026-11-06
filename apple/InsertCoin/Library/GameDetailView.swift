@@ -12,6 +12,7 @@ struct GameDetailView: View {
     @AppStorage(SettingKey.addToCloud) private var addToCloud = true
     @ObservedObject private var cloud = CloudROMs.shared
     @ObservedObject private var downloads = Downloads.shared
+    @ObservedObject private var art = GameArt.shared
     @Environment(\.dismiss) private var dismiss
     @State private var optionsFor: String
     @State private var importing = false
@@ -34,6 +35,9 @@ struct GameDetailView: View {
     var body: some View {
         Form {
             Section {
+                GamePicture(romset: game.pictureSet)
+                    .frame(maxWidth: 480)
+                    .frame(maxWidth: .infinity)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(game.title).font(.title2.bold())
                     Text(game.platform.name).foregroundStyle(.secondary)
@@ -43,7 +47,7 @@ struct GameDetailView: View {
                 ForEach(Array(game.versions.enumerated()), id: \.element.id) { i, version in
                     row(version)
                         #if !os(tvOS)
-                        .listRowBackground(selected == i && GCController.current != nil ? Color.accentColor.opacity(0.2) : nil)
+                        .listRowBackground(selected == i && MenuPad.read() != nil ? Color.accentColor.opacity(0.2) : nil)
                         #endif
                 }
                 if let message {
@@ -62,27 +66,17 @@ struct GameDetailView: View {
                 GameOptionsSections(game: version) { refresh += 1 }
                     .id("\(version.id)-\(refresh)")
             }
-            if let history {
+            let extras = ArtKind.extras.filter { art.has(artSet, $0) }
+            if history != nil || !extras.isEmpty {
                 Section("About this game") {
-                    Text(history.facts).font(.callout).foregroundStyle(.secondary)
-                        #if os(tvOS)
-                        .focusable() // the focus engine scrolls only to what it can focus
-                        #endif
-                    ForEach(history.paragraphs, id: \.self) { paragraph in
-                        Text(paragraph)
-                            .padding(.vertical, 4)
-                            #if os(tvOS)
-                            .focusable()
-                            #endif
-                    }
-                    #if !os(tvOS) // Apple TV has no browser
-                    ForEach(history.links, id: \.url) { Link($0.label, destination: $0.url) }
-                    #endif
+                    if !extras.isEmpty { ArtRow(romset: artSet, kinds: extras) }
+                    if let history { historyRows(history) }
                 }
             }
         }
         .formStyle(.grouped)
         .navigationTitle(game.title)
+        .onAppear { art.want(artSet, ArtKind.extras) }
         #if !os(tvOS)
         .onReceive(padTimer) { _ in padTick() }
         .fileImporter(isPresented: $importing, allowedContentTypes: Storage.romTypes, allowsMultipleSelection: true) { result in
@@ -100,6 +94,26 @@ struct GameDetailView: View {
         #endif
     }
 
+    /// The set the page's extra art is for: the game's first version.
+    private var artSet: String { game.versions[0].id }
+
+    @ViewBuilder private func historyRows(_ history: GameHistory) -> some View {
+        Text(history.facts).font(.callout).foregroundStyle(.secondary)
+            #if os(tvOS)
+            .focusable() // the focus engine scrolls only to what it can focus
+            #endif
+        ForEach(history.paragraphs, id: \.self) { paragraph in
+            Text(paragraph)
+                .padding(.vertical, 4)
+                #if os(tvOS)
+                .focusable()
+                #endif
+        }
+        #if !os(tvOS) // Apple TV has no browser
+        ForEach(history.links, id: \.url) { Link($0.label, destination: $0.url) }
+        #endif
+    }
+
     private func ready(_ version: GameInfo) -> Bool {
         CoreLibrary.exists(version.id) && (Storage.rom(version.id) != nil || cloud.items[version.id] != nil)
     }
@@ -112,7 +126,7 @@ struct GameDetailView: View {
             playing = version
         } else if romServer.isEmpty {
             message = Storage.isFolder(version.id)
-                ? "Add its game folder (\(version.id), the folder that holds disk0) or \(version.id).\(GamePackage.ext), or set your ROM server in Settings."
+                ? "Add its game folder (\(version.id), the folder that holds \(Storage.folderMark(version.id))) or \(version.id).\(GamePackage.ext), or set your ROM server in Settings."
                 : "Add its ROM set (\(version.id).zip or .7z), or set your ROM server in Settings."
         } else if downloading == nil {
             download(version)
@@ -124,7 +138,7 @@ struct GameDetailView: View {
         Task {
             do {
                 try await RomServer.download(version.id, from: romServer)
-                message = "Downloaded \(version.id)."
+                message = downloads.downloaded(version.id)
             } catch {
                 message = error.localizedDescription
             }
@@ -185,6 +199,11 @@ struct GameDetailView: View {
                         .disabled(downloading != nil)
                 }
             } else {
+                if rom != nil, let problem = downloads.problem(version.id) {
+                    Label("Failed the ROM check", systemImage: "exclamationmark.triangle")
+                        .font(.caption).foregroundStyle(.orange)
+                        .help(problem)
+                }
                 if rom == nil, let inCloud {
                     Image(systemName: inCloud.downloaded ? "icloud" : "icloud.and.arrow.down")
                         .foregroundStyle(.secondary)
@@ -198,24 +217,93 @@ struct GameDetailView: View {
         .padding(.vertical, 10)
     }
 
-    /// A controller on macOS and iOS: up and down choose a version, A plays
+    /// A controller on macOS and iOS, or a wheel on the Mac: up and down choose a version, A plays
     /// (or downloads) it, B goes back to the library.
     private func padTick() {
-        guard playing == nil,
-              let gp = GCController.current?.extendedGamepad ?? GCController.controllers().compactMap(\.extendedGamepad).first
-        else { return }
+        guard playing == nil, let gp = MenuPad.read() else { return } // a gamepad, or a wheel (MenuPad)
         if !pad.armed {
-            pad.armed = !gp.buttonA.isPressed && !gp.buttonB.isPressed
+            pad.armed = !gp.a && !gp.b
             return
         }
-        let y = gp.dpad.yAxis.value + gp.leftThumbstick.yAxis.value
+        let y = gp.moveY
         let move = y > 0.5 ? -1 : y < -0.5 ? 1 : 0
         if pad.repeats(move) {
             selected = min(max(0, selected + move), game.versions.count - 1)
             optionsFor = game.versions[selected].id
         }
-        if pad.pressed("a", gp.buttonA.isPressed) { activate(game.versions[selected]) }
-        if pad.pressed("b", gp.buttonB.isPressed) { dismiss() }
+        if pad.pressed("a", gp.a) { activate(game.versions[selected]) }
+        if pad.pressed("b", gp.b) { dismiss() }
     }
     #endif
+}
+
+/// The game's other art (GameArt) in a row under About this game: the
+/// flyer, marquee, cabinet and in-game shot it has, each opening full size.
+/// Each is a button, so the Apple TV remote can reach them.
+struct ArtRow: View {
+    let romset: String
+    let kinds: [ArtKind]
+    @State private var shown: ArtKind?
+
+    #if os(tvOS)
+    private static let height: CGFloat = 220
+    #else
+    private static let height: CGFloat = 120
+    #endif
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 16) {
+                ForEach(kinds) { kind in
+                    if let image = GameArt.shared.image(romset, kind) {
+                        Button { shown = kind } label: {
+                            VStack(spacing: 6) {
+                                Image(decorative: image, scale: 1).resizable().scaledToFit()
+                                    .frame(height: Self.height)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                                Text(kind.name).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        #if os(tvOS)
+                        .buttonStyle(.card)
+                        #else
+                        .buttonStyle(.plain)
+                        #endif
+                        .accessibilityLabel(kind.name)
+                    }
+                }
+            }
+            .padding(.vertical, 8)
+        }
+        .sheet(item: $shown) { kind in
+            ArtViewer(romset: romset, kind: kind) { shown = nil }.appAppearance()
+        }
+    }
+}
+
+/// One piece of art, as large as the screen allows.
+struct ArtViewer: View {
+    let romset: String
+    let kind: ArtKind
+    let close: () -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            if let image = GameArt.shared.image(romset, kind) {
+                Image(decorative: image, scale: 1).resizable().scaledToFit()
+            }
+            HStack {
+                Text(kind.name).font(.headline)
+                Spacer()
+                Text("From the Arcade Database or libretro-thumbnails").font(.caption).foregroundStyle(.secondary)
+                #if !os(tvOS) // the remote's Menu button closes it
+                Button("Done", action: close).keyboardShortcut(.cancelAction)
+                #endif
+            }
+        }
+        .padding()
+        #if os(macOS)
+        .frame(minWidth: 640, idealWidth: 900, minHeight: 520, idealHeight: 760)
+        #endif
+    }
 }

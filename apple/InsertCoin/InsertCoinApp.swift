@@ -60,6 +60,7 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Wheel.start() // steering wheels (IOKit HID): connected now, or later
         // The Edit menu's items carried the text keys; text fields keep them.
         keys = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -91,6 +92,10 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        Wheel.shared.letGo() // the self-centring spring off, as the wheel starts
+    }
 }
 #endif
 
@@ -162,10 +167,12 @@ struct RootView: View {
             dismissSplash()
         }
         .task { await meetCabinets() }
+        .task { await launchArguments() }
         .sheet(item: $continueAs) { list in
             ContinueAsView(cabinets: list.cabinets) { continueAs = nil }.appAppearance()
         }
         .onChange(of: playing) { game in
+            GameArt.shared.holding = game != nil // no art downloads while a game plays
             if let game { start(game) }
         }
         .onChange(of: volume) { v in session?.setVolume(v) }
@@ -189,6 +196,7 @@ struct RootView: View {
 
     private func start(_ game: GameInfo) {
         guard let lib = CoreLibrary.load(game.id) else {
+            print("play: \(game.id) has no core in this build")
             playing = nil
             return
         }
@@ -204,9 +212,11 @@ struct RootView: View {
                 preparing = nil
                 guard playing == game, session == nil else { return }
                 session = try GameSession(game: game, library: lib, rom: rom, volume: volume)
+                print("play: \(game.id) started")
                 LastPlayed.mark(game.id)
                 StereoBridge.shared.play(game)
             } catch {
+                print("play: \(game.id) did not start: \(error.localizedDescription)")
                 preparing = nil
                 self.error = error.localizedDescription
                 playing = nil
@@ -225,6 +235,24 @@ struct RootView: View {
         } else {
             await SaveSync.announce()
         }
+    }
+
+    /// `--play <set> [--seconds N]`: start that game as a tap in the library
+    /// would, and quit after N seconds. For unattended device test runs
+    /// (devicectl launches the app with arguments and attaches the console).
+    private func launchArguments() async {
+        let args = CommandLine.arguments
+        guard let i = args.firstIndex(of: "--play"), i + 1 < args.count,
+              let game = GameInfo.all.first(where: { $0.id == args[i + 1] }) else { return }
+        try? await Task.sleep(nanoseconds: 1_500_000_000) // past the splash
+        print("launch: --play \(game.id)")
+        playing = game
+        guard let j = args.firstIndex(of: "--seconds"), j + 1 < args.count,
+              let seconds = UInt64(args[j + 1]), seconds > 0 else { return }
+        try? await Task.sleep(nanoseconds: seconds * 1_000_000_000)
+        print("launch: --seconds \(seconds) reached, quitting")
+        stop()
+        exit(0)
     }
 
     private func stop() {
@@ -261,7 +289,7 @@ struct PlayView: View {
         self.session = session
         self.onExit = onExit
         _gameLook = AppStorage(wrappedValue: "", ScreenLook.gameKey(session.game.id))
-        _crosshair = AppStorage(wrappedValue: true, SettingKey.crosshair(session.game.id))
+        _crosshair = AppStorage(wrappedValue: session.game.crosshairByDefault, SettingKey.crosshair(session.game.id))
     }
 
     private var look: ScreenLook { ScreenLook.resolved(global: globalLook, game: gameLook) }
@@ -339,8 +367,17 @@ struct PlayView: View {
         #endif
         #if os(iOS)
         .persistentSystemOverlays(.hidden)
-        .onAppear { session.controls.showTouchControls(!["vcop2", "vcop", "hotdo", "gunblade", "bel", "rchase2", "hotd4a", "letsgoju"].contains(session.game.id) && !session.game.analogGun, fighting: session.game.fighting, fishing: session.game.fishing) } // the gun is the touch screen
-        .onDisappear { session.controls.showTouchControls(false) }
+        .onAppear {
+            let game = session.game
+            let byTouch = game.aimsGun && TouchControls.aimsByTouch(game.id) // the gun is the touch screen
+            session.controls.touchAims = byTouch
+            let layout: Controls.TouchLayout? = byTouch ? nil
+                : game.aimsGun ? .gun(button: game.gunButton)
+                : game.fighting ? .fighting : game.fishing ? .fishing : game.twin ? .twin
+                : game.controls == .drive ? .drive : .standard
+            session.controls.startTouchControls(TouchControls.resolved(game.id), layout: layout)
+        }
+        .onDisappear { session.controls.stopTouchControls() }
         #endif
         .overlay {
             if session.menuOpen { PauseMenu(session: session) }
@@ -401,6 +438,8 @@ struct PauseMenu: View {
             #if os(macOS)
             if session.showControls {
                 ControlsCard(game: session.game) { session.showControls = false }
+            } else if session.showWheel {
+                WheelPanel(model: session.wheelPanel) { session.showWheel = false }
             } else {
                 items
             }
@@ -462,6 +501,9 @@ struct AppSettingsView: View {
     @AppStorage(SettingKey.recordReplay) private var recordReplays = false
     @AppStorage(SettingKey.showSpeed) private var showSpeed = false
     @AppStorage(SettingKey.appearance) private var appearance = Appearance.dark
+    @AppStorage(SettingKey.downloadArt) private var downloadArt = true
+    @AppStorage(SettingKey.touchControls) private var touchControls = TouchControls.automatic
+    @State private var artSize = GameArt.size()
     @State private var showCabinets = false
 
     var body: some View {
@@ -505,7 +547,31 @@ struct AppSettingsView: View {
                     LabeledContent("Last start", value: last)
                 }
             }
+            #if os(iOS)
+            Section("On-screen controller") {
+                Picker("On-screen controller", selection: $touchControls) {
+                    ForEach(TouchControls.allCases) { Text($0.name).tag($0) }
+                }
+                Text("The controller drawn over a game on the touch screen. Automatic shows it while no controller is connected, and hides it while one is. Always shows it beside a controller too, as player 2. The gun games aim by touch unless their page says otherwise. Coin, Start and Pause are always there. A game's page can give it its own.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            #endif
+            Section("Game art") {
+                Toggle("Download game art", isOn: $downloadArt)
+                Text("Title screens, flyers, marquees and cabinets for the library and each game's page, downloaded to this device as you browse, from the Arcade Database (adb.arcadeitalia.net) and libretro-thumbnails. Only the game's MAME set name is sent. Your own pictures always come first.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Button("Remove downloaded art (\(ByteCountFormatter.string(fromByteCount: artSize, countStyle: .file)))", role: .destructive) {
+                    GameArt.shared.removeAll()
+                    artSize = GameArt.size()
+                }
+                .disabled(artSize == 0)
+                Text("Your own pictures stay. With Download game art on, the art downloads again as you browse.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             CabinetSettingsSection(showCabinets: $showCabinets)
+            #if os(macOS)
+            WheelSettingsSection()
+            #endif
             #if !os(tvOS)
             Section("iCloud Drive") {
                 if let folder = cloud.folder {

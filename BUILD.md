@@ -1,10 +1,9 @@
 # Building Arcade Foundry: Insert Coin
 
-How to build the game cores and the apps. For what the app does and how to
-use it, see the [README](README.md). For the games and their set names, see
-[GAMES.md](GAMES.md).
+How to build the game cores and the apps. For an overview of the app and how to use it, see the [README](README.md).
+For the supported games and their set names, see [GAMES.md](GAMES.md).
 
-The cores are made from your own ROM sets on your own machine. Nothing in
+The cores are built from your own ROM sets on your own machine. Nothing in
 these repositories contains ROM data or code generated from it. Cores built
 from your ROMs are derived from them, so don't share them.
 
@@ -13,12 +12,14 @@ from your ROMs are derived from them, so don't share them.
 You need Xcode, CMake, Ninja, Python 3 and
 [XcodeGen](https://github.com/yonaskolb/XcodeGen):
 
-    brew install cmake ninja xcodegen
+    brew install cmake ninja xcodegen python gh sdl2 sdl3 sevenzip
 
 Then:
 
     git clone --recursive https://github.com/TheBrinkOfTomorrow/Arcade-Foundry-Insert-Coin
     cd Arcade-Foundry-Insert-Coin
+    git pull && git submodule update --init --recursive
+    cores/arcade-foundry-cores-common/tools/afic-venv/setup.sh    
     python3 scripts/build_cores.py --roms ~/path/to/roms   # each <set>.zip/.7z found there
     cd apple && xcodegen && open InsertCoin.xcodeproj
 
@@ -28,22 +29,43 @@ is in the cores submodule) and builds its core as a framework into
 
 For iPhone, iPad and Apple TV, add
 `--platforms macosx,iphoneos,iphonesimulator,appletvos,appletvsimulator`
-and build the InsertCoin-iOS or InsertCoin-tvOS target. `--sets vf3,scud`
-builds only the sets you name.
+and build the InsertCoin-iOS or InsertCoin-tvOS target.
+`--sets vf3,scud` builds only the sets you name;
+`--boards model3` builds every set of a board
+(`model2` is all of Model 2, 2A, 2B and 2C; `classic2d` every 2D board).
+`--boards list` lists the boards, and `--sets list` every set by board, oldest board first.
+
+## Updating
+
+When there's a new version, in the app's folder (on any machine):
+
+    git pull && git submodule update --init --recursive
+
+`git pull` alone updates the app but leaves the cores folders
+(`cores/...`) on their old versions, so always run both. Then build again
+as you did the first time: `python3 scripts/build_cores.py --roms <your ROM
+folder>` rebuilds only the cores that changed, and on Linux
+`cmake --build build/linux` (or Xcode on a Mac) rebuilds the app. Your
+saves, settings and pictures are kept outside the app folder, so they carry
+over.
 
 ### The ROM folder
 
 The ROM folder (`--roms`) holds one file per set, named after the set
-(`srallyc.zip`, `scud.7z`, `hotd4a.tar`), either directly in it or in a
+(e.g. `srallyc.zip`, `scud.7z`, `hotd4a.tar`), either directly in it or in a
 folder per board, one level down and flat (no folders inside):
 
     roms/
-      OutRun/     outrun.zip  shangon.zip
-      XBoard/     aburner2.zip  thndrbld.zip
+      OutRun/     outrun.zip  shangon.zip  toutrun.zip
+      System32/   orunners.zip  radr.zip  radm.zip  f1en.zip  jpark.zip  sonic.zip  ga2.zip
+      HangOn/     hangon.zip  sharrier.zip  enduror.zip
+      XBoard/     aburner131.zip  aburner2.zip  thndrbld.zip  rachero.zip  smgp.zip  loffire.zip  gprider.zip
+      YBoard/     gforce2.zip  pdrift.zip  gloc.zip  strkfgtr.zip  rchase.zip
       Model1/     vr.7z  swa.7z  vf.7z  wingwar.7z  model1io2.zip
       Model2/     daytona.zip  srallyc.zip  hotd.7z ...
       Model3/     scud.zip  vf3.zip  bassdx.zip ...
       Lindbergh/  hotd4a.tar  outr2sdx.tar ...
+      Chihiro/    vcop3/  hotd3/
       working/    (work folders: skipped)
 
 A board folder may also hold a folder per game, named after the set, with
@@ -61,7 +83,7 @@ Folders named `working`, `temp` or `to-file…`, and any starting with `_` or
 `.`, are work folders and are skipped, as is anything deeper than a board
 folder. If a set is in two places, the copy at the top (then the first
 board folder by name) is used and the other is named in a warning.
-`scripts/serve_roms.py` and `pack_lindbergh.py` look the same way, on macOS and Linux alike.
+`scripts/serve_roms.py` and `pack_games.py` look the same way, on macOS and Linux alike.
 
 ### Signing
 
@@ -92,6 +114,25 @@ first run on a new iCloud container:
 4. Deploy the schema to Production in the CloudKit Console, so release
    builds can back up saves.
 
+#### The shared Python venv (required for Lindbergh and Chihiro games)
+
+Every Python module the app and the cores use (the Lindbergh and Chihiro
+translator's `capstone` and `pyelftools`, and the rest) goes in one virtual
+environment per machine, `~/venvs/afic`, never into the system's Python and
+never into a venv inside a core checkout. Make it once, and again when
+Cores-Common's `tools/afic-venv/requirements.txt` changes:
+
+    cd <local-repo-folder-location>
+    git pull && git submodule update --init --recursive
+    cores/arcade-foundry-cores-common/tools/afic-venv/setup.sh
+
+`AFIC_VENV` puts it somewhere else. `build_cores.py` runs the translator
+with the venv it runs under, else `$AFIC_VENV/bin/python3` (default
+`~/venvs/afic`), else its own Python. Without the modules, a Lindbergh or
+Chihiro build stops with `ModuleNotFoundError: No module named 'capstone'`.
+The old `cores/arcade-foundry-cores-lindbergh/venv` and
+`cores/arcade
+
 ### Lindbergh games
 
 Lindbergh games are the game's disk, not ROM sets. Put the game folder (the
@@ -102,7 +143,7 @@ app with Add ROM.
 Their cores build for macOS, Linux, iPhone and iPad
 (`--platforms macosx,iphoneos,iphonesimulator`), not Apple TV. They need:
 
-- a Python venv for the translator (below)
+- the shared Python venv, `~/venvs/afic`, for the translator (below)
 - on macOS, `brew install sdl2` (headers only)
 - for iPhone and iPad, Ninja. The build fetches gl4es, which runs the
   games' OpenGL on OpenGL ES.
@@ -119,29 +160,49 @@ In the app, Add ROM with iCloud Drive on packs it into iCloud Drive by
 itself, and the game stays on the Mac too. "Copy to iCloud Drive" on the
 game's page does the same later. For a ROM server,
 
-    python3 scripts/pack_lindbergh.py --roms ~/path/to/roms
+    python3 scripts/pack_games.py --roms ~/path/to/roms
 
 writes one beside each game folder. A device unpacks it into its ROMs
 folder before the first play. A ROM server download is unpacked as it
 arrives, so the game is never stored twice. Add ROM also takes a
 `<set>.tar`, and `build_cores.py` and the Linux app read it too.
 
-#### The Python venv for Lindbergh cores
+-foundry-cores-chihiro/venv` folders are no longer used and can
+be deleted.
 
-The Lindbergh translator runs at build time and needs the Python packages
-`capstone` and `pyelftools`. Homebrew's Python refuses `pip install` into
-itself, so make a virtual environment once, inside the Lindbergh submodule
-and named `venv` (git-ignored there):
+### Chihiro games
 
-    python3 -m venv cores/arcade-foundry-cores-lindbergh/venv
-    cores/arcade-foundry-cores-lindbergh/venv/bin/pip install capstone pyelftools
+The Chihiro games and their core are not in the 1.2.0 release; they are
+planned for 1.3.0. This section is for when they are.
 
-`build_cores.py` uses `cores/arcade-foundry-cores-lindbergh/venv/bin/python`
-when it exists (or the `venv` of the checkout given with `--lindbergh`), and
-otherwise the Python it runs under. Without it, a Lindbergh build stops
-with `ModuleNotFoundError: No module named 'capstone'`. A fresh clone, or
-`git submodule update --init` after deleting the submodule folder, needs
-the venv made again.
+A Chihiro game is a folder named after its set that holds the game's XBE:
+`roms/vcop3/vc3.xbe` (Virtua Cop 3), `roms/hotd3/hod3xb.xbe` (The House of
+the Dead III), with the rest of the game's files beside it. Add that folder
+in the app with Add ROM. The cores build for macOS and Linux only for now
+(`build_cores.py --boards chihiro`), and the translator needs the same
+Python packages as Lindbergh's (`capstone`, `pyelftools`), from the same
+shared venv (above).
+
+Like a Lindbergh game, it also travels as one file, `<set>.tar`, which
+`build_cores.py`, the Linux app, Add ROM, iCloud Drive and the ROM server
+all take. A game dumped as a `.7z` of its disc files (`Chihiro/Virtua Cop
+3.7z`, the XBE at its top) becomes one with
+
+    python3 scripts/pack_games.py --roms ~/path/to/roms
+
+which finds each dump by the XBE inside it, unpacks it with `7zz`, `7z`,
+`7za` or `bsdtar` (`brew install sevenzip`; on Linux the `7zip` or `p7zip-full` package) and
+writes `vcop3.tar`, `hotd3.tar` beside it. The `.7z` is left as it is.
+
+The baseboard's EEPROMs (its operator settings and board ID) come from
+MAME's Chihiro BIOS set. Leave `chihiro.zip` zipped, anywhere in the ROM
+folder (`Chihiro/chihiro.zip` beside the games is fine): the core reads it
+straight from the zip, and the Linux app points the core at it even for a
+game unpacked from its `.tar`. On Apple devices, add `chihiro.zip` with Add
+ROM like a ROM set. Without it the games still play: the first start uses
+factory operator settings and a blank board ID. Either way the core keeps
+what the game writes to its EEPROMs (`baseboard-eeprom.bin` in the game's
+save folder), so test-menu changes survive a restart.
 
 ### Model 3 cores
 
@@ -152,7 +213,7 @@ ROMs. On Apple platforms they draw with Metal and need nothing extra. Build
 them like the others:
 
     python3 scripts/build_cores.py --roms ~/path/to/roms \
-        --sets vf3,scud,scudplus,daytona2,dayto2pe,srally2,lemans24,dirtdvls,harley,ecau,fvipers2,von2,spikeout,spikeofe,vs299a,swtrilgy,lostwsga,lamachin,oceanhuna,magtruck \
+        --boards model3 \
         --platforms macosx,iphoneos,appletvos
 
 The framework carries the GPL's text, and the app embeds it like any other
@@ -196,7 +257,9 @@ the core's own notices. Supporters can go in a section of their own.
 
 You need CMake, Ninja, a C++20 compiler and Python 3, plus SDL's usual
 development packages for X11/Wayland and audio. Model 3 cores also need
-`libsdl2-dev libsdl2-net-dev libglu1-mesa-dev libegl-dev`.
+`libsdl2-dev libsdl2-net-dev libglu1-mesa-dev libegl-dev`. Game art
+downloads need libcurl (`libcurl4-openssl-dev`, or `libcurl-devel` on
+Fedora); without it CMake warns and the app builds without them.
 
 1. The cores, from your ROM sets:
 
@@ -216,6 +279,26 @@ development packages for X11/Wayland and audio. Model 3 cores also need
        build/linux/insert-coin --roms ~/path/to/roms
 
 See the [README](README.md#linux) for the Linux app's options.
+
+### The SDL3 app on a Mac
+
+The same SDL3 app also builds on a Mac with Apple silicon. It has the
+Linux app's features, not the SwiftUI app's: no iCloud saves or ROM sync,
+no ROM server, no touch controls or gameplay videos. It suits a Mac kept
+as a cabinet or kiosk, running full screen with game controllers or a
+wheel and no mouse or keyboard. It uses the Mac's cores (step 1 of
+[macOS](#macos-iphone-ipad-and-apple-tv), which builds them into
+`build/cores/macosx`) and draws with Metal; the Model 3
+screen goes to the window straight from the GPU, as in the SwiftUI app.
+You need CMake and Ninja (`brew install cmake ninja`); SDL3 comes with the
+cores' sources.
+
+    cmake -S linux -B build/sdl-mac -G Ninja
+    cmake --build build/sdl-mac
+    build/sdl-mac/insert-coin --roms ~/path/to/roms --fullscreen
+
+It keeps its files in `~/.local/share/arcade-foundry/`, apart from the
+SwiftUI app's, and takes the options in the [README](README.md#linux).
 
 ### arm64 boards (Raspberry Pi 4 and 5, Orange Pi 5, ODROID-N2)
 
@@ -257,19 +340,27 @@ The cores come from your ROMs: keep the file to yourself. One build serves
 every board (generic armv8-a). `--here` skips the container (an arm64
 Linux, or an x86-64 Debian/Ubuntu with the Dockerfile's packages).
 
-## Updating
+## Adding a game
 
-When there's a new version, in the app's folder (on any machine):
+The games are listed once, in `games.toml` files: each core repo's lists
+every set it builds (title, year, board, version, core version, controls),
+and this repo's lists the sets the app shows, in the library's order, with
+the hint its detail line gives. `scripts/gen_games.py` (Python 3.11 or
+later) writes the rest from them: the Apple catalog
+(`apple/InsertCoin/Library/GameList.swift`), the Linux app's table
+(`linux/game_list.h`), `build_cores.py`'s lists (`scripts/game_sets.py`)
+and the tables in [GAMES.md](GAMES.md). For a new game:
 
-    git pull && git submodule update --init
+1. Add its `[[game]]` to the core repo's `games.toml`, run that repo's
+   `gen_games.py`, and commit it there with the core's code.
+2. Move the core's submodule here to that commit.
+3. Add its `[[game]]` to `games.toml` here, in the place it goes in the
+   library, with its `hint`.
+4. Run `python3 scripts/gen_games.py` and commit what it wrote, with a
+   `history/<set>.md` for a new card.
 
-`git pull` alone updates the app but leaves the cores folders
-(`cores/...`) on their old versions, so always run both. Then build again
-as you did the first time: `python3 scripts/build_cores.py --roms <your ROM
-folder>` rebuilds only the cores that changed, and on Linux
-`cmake --build build/linux` (or Xcode on a Mac) rebuilds the app. Your
-saves, settings and pictures are kept outside the app folder, so they carry
-over.
+CI runs `scripts/gen_games.py --check`, which fails when a generated file
+does not match the `games.toml` files.
 
 ## Versions
 
