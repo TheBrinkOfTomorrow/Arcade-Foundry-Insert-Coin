@@ -5,6 +5,7 @@
 #include "art.h"
 #include "input.h"
 #include "render.h"
+#include "states.h"
 
 namespace insert_coin {
 
@@ -19,7 +20,7 @@ std::vector<std::string> set_names(const std::string &set);
 // The ROM sets in --roms, at its top or one folder down in a folder per
 // board (DIR/Model2/srallyc.zip, DIR/Lindbergh/hotd4a.tar), found as
 // scripts/rom_index.py finds them: <name>.zip, .7z or .tar, or a <name>/
-// folder holding disk0; work folders skipped (working, temp, to-file...,
+// folder holding disk0 (or a PC-based game's program, runner.h); work folders skipped (working, temp, to-file...,
 // names starting with _ or .); a name in two places: the copy at the top,
 // then the first by path, with a warning. They are linked into one flat
 // folder, dst (made again at each start), where each game's core also finds
@@ -143,18 +144,22 @@ struct GamePage {
     bool waiting = false;
     int art_view = -1;   // the art is open full size: which of art_files (Left/Right step through)
 
+    std::vector<bool> resumable; // each version has a Resume slot to offer (can_resume, states.h), from reload
+
     struct Row {
-        int version, option; // option -1: the version's own row
+        int version, option; // option -1: the version's own row (Play), -2: Resume, above it
     };
     const Game &chosen() const { return *game.versions[version]; }
     bool folds() const { return game.versions.size() > 1; }
     int options(int v) const {
         const Game &g = *game.versions[v];
+        if (g.pc) return 1; // its game folder; the runner has its own screen and controls for now
         return g.api ? kPageOptions + (shows_crosshair(g) ? 1 : 0) + (core_regions(g).empty() ? 0 : 1) : 0;
     }
     // what option row k of the chosen version is: 0 shape, 1 effect, 2
     // buttons, 3 crosshair, 4 region (rows only for what it has)
     int option_kind(int k) const {
+        if (chosen().pc) return 5;
         if (k < kPageOptions) return k;
         if (k == kPageOptions && shows_crosshair(chosen())) return 3;
         return 4;
@@ -163,6 +168,7 @@ struct GamePage {
     std::vector<Row> rows() const {
         std::vector<Row> out;
         for (int v = 0; v < int(game.versions.size()); ++v) {
+            if (size_t(v) < resumable.size() && resumable[size_t(v)]) out.push_back({v, -2});
             out.push_back({v, -1});
             if (open == v)
                 for (int k = 0; k < options(v); ++k) out.push_back({v, k});
@@ -183,6 +189,11 @@ struct GamePage {
         crosshair = crosshair_on(o, chosen().romset);
         region = region_of(o, chosen());
         map = ButtonMap::load(buttons_file(o));
+        // the cursor stays on the same row (a version's Resume row comes and goes)
+        const Row at = item < items() ? row() : Row{version, -1};
+        resumable.clear();
+        for (const Game *g : game.versions) resumable.push_back(can_resume(o, *g));
+        item = index_of(at.version, at.option == -2 && !resumable[size_t(at.version)] ? -1 : at.option);
     }
 };
 
@@ -204,7 +215,8 @@ std::vector<std::pair<fs::path, std::string>> art_files(const GamePage &page, co
 
 // The app's settings (issue #315), as the Apple app's Settings: every
 // game's screen settings (a game's own, from its pause menu or its page,
-// win), full screen, the speed readout and the game thread, kept in
+// win), full screen, the speed readout, the game thread and Resume where I
+// left off (states.h), kept in
 // <data>/settings as "key=value" lines (the screen's as Look::str's pairs).
 // Game art (art.h): Download game art, and Remove downloaded art (done by
 // the caller, which holds the Art).
@@ -212,6 +224,7 @@ std::vector<std::pair<fs::path, std::string>> art_files(const GamePage &page, co
 struct AppSettings {
     Look look;
     bool show_speed = true, game_thread = true, download_art = true;
+    bool resume = false; // Resume where I left off, off until the player turns it on
 
     void load(const fs::path &file);
     void save(const fs::path &file) const;
@@ -219,6 +232,7 @@ struct AppSettings {
         o.look = look;
         o.show_speed = show_speed;
         o.game_thread = game_thread;
+        o.resume = resume;
     }
 };
 
@@ -226,9 +240,9 @@ struct AppSettings {
 // a row per setting under SCREEN, SPEED, GAME ART and ABOUT; Up/Down choose,
 // Left/Right or Return (South) change, Return on Credits opens them, Esc
 // (East) back.
-enum class SettingRow { shape, effect, smooth, size, move_x, move_y, fullscreen, show_speed, game_thread, download_art, remove_art, credits };
+enum class SettingRow { shape, effect, smooth, size, move_x, move_y, fullscreen, show_speed, game_thread, resume, download_art, remove_art, credits };
 
-const int kSettingRows = 12;
+const int kSettingRows = 13;
 
 // Changes row `row` one step (-1 back, 1 on) in `s`; full screen through
 // set_fullscreen. Remove downloaded art and Credits have nothing to change.

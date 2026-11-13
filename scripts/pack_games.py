@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pack Lindbergh and Chihiro game folders as one file each, for iCloud Drive and the ROM server.
 
-  pack_games.py --roms DIR [--out DIR] [--sets hotd4a,vcop3,...]
+  pack_games.py --roms DIR [--out DIR] [--sets hotd4a,vcop3,...] [--force]
 
 A Lindbergh game is a folder (DIR/hotd4a/, the one that holds disk0); a
 Chihiro game is the folder that holds its XBE (DIR/vcop3/vc3.xbe). The app
@@ -18,6 +18,14 @@ the XBE at the archive's top) is packed too: it is found by the XBE inside,
 unpacked into a work folder beside it with 7zz, 7z, 7za or bsdtar, written
 as <set>.tar and the work folder removed. The .7z is left as it is.
 
+A Chihiro GD-ROM image dumped decrypted (a .bin, .img or .iso that starts
+with "FATX", such as "Crazy Taxi High Roller (Rev B) (GDX-0002B).bin") is
+read the same way with scripts/fatx.py, no other tool needed. It wins over
+a .7z of the same game when both hold the same XBE (the Crazy Taxi .7z
+dumps going round hold filler where its attract movies should be); an
+image with another XBE (VC3's later GDX-0003B) loses to the .7z, which the
+core was made from, and never replaces a <set>.tar of another XBE. The image is only read.
+
 `tar -chf hotd4a.tar -C DIR hotd4a` makes the same file from a folder
 (`h` follows symbolic links).
 """
@@ -25,10 +33,13 @@ as <set>.tar and the work folder removed. The .7z is left as it is.
 import argparse
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import tarfile
+import zlib
 
+from fatx import Fatx
 from game_sets import CHIHIRO, LINDBERGH
 from rom_index import index, names, work_folder
 
@@ -61,19 +72,39 @@ def pack(folder, set_name, out):
     os.replace(tmp, out)
 
 
+def remove_tree(path):
+    """shutil.rmtree that also removes read-only folders (a game's tar can
+    hold folders without write permission, which rmtree can't empty)."""
+    if os.path.isdir(path) and not os.path.islink(path):
+        os.chmod(path, os.stat(path).st_mode | 0o700)
+        make_writable(path)
+    shutil.rmtree(path, ignore_errors=True)
+
+
+def make_writable(root):
+    """Gives the owner write permission on every folder under `root`, so the
+    unpacked game can be replaced or removed later."""
+    for here, dirs, _files in os.walk(root):
+        for d in dirs:
+            p = os.path.join(here, d)
+            if not os.path.islink(p):
+                os.chmod(p, os.stat(p).st_mode | 0o700)
+
+
 def unpack(tar_path, set_names, dst, required="disk0"):
     """Unpack <set>.tar into `dst` (the folder that holds `required`: disk0,
     or a Chihiro game's XBE); the set's name (any of set_names) as the top
     folder is optional. Refuses anything outside it."""
     tmp = dst + ".unpacking"
-    shutil.rmtree(tmp, ignore_errors=True)
+    remove_tree(tmp)
     os.makedirs(tmp)
     try:
         extract(tar_path, set_names, tmp, required)
+        make_writable(tmp)
     except BaseException:
-        shutil.rmtree(tmp, ignore_errors=True)
+        remove_tree(tmp)
         raise
-    shutil.rmtree(dst, ignore_errors=True)
+    remove_tree(dst)
     os.replace(tmp, dst)
 
 
@@ -105,13 +136,18 @@ def extract(tar_path, set_names, tmp, required="disk0"):
         if hasattr(tarfile, "data_filter"):
             tar.extractall(tmp, members=members, filter="data")
         else:
+            # Python before 3.12 (Xcode's 3.9): checked here, then extractall,
+            # which sets each folder's permissions after its files are in (one
+            # tar.extract at a time made a read-only folder before its files).
             root = os.path.realpath(tmp)
             for m in members:
                 if m.name.startswith("/") or ".." in m.name.split("/"):
                     sys.exit(f"{tar_path}: a file outside the game folder: {m.name}")
                 if not os.path.realpath(os.path.join(tmp, os.path.dirname(m.name))).startswith(root):
                     sys.exit(f"{tar_path}: a file outside the game folder: {m.name}")
-                tar.extract(m, tmp)
+                if not (m.isfile() or m.isdir() or m.issym() or m.islnk()):
+                    sys.exit(f"{tar_path}: not a file or folder: {m.name}")
+            tar.extractall(tmp, members=members)
     if not os.path.exists(os.path.join(tmp, required)):
         sys.exit(f"{tar_path}: no {required}: pack the game folder that holds {required}")
 
@@ -170,10 +206,91 @@ def chihiro_dumps(roms, wanted):
     return found
 
 
+IMAGE_EXTS = (".bin", ".img", ".iso")
+
+
+def crc_in_7z(archive, name):
+    """CRC-32 of one file inside a .7z, streamed out with the first tool there is; None if none can."""
+    cmds = [[t, "e", "-so", "-bd", archive, name] for t in SEVEN_ZIP_TOOLS if shutil.which(t)]
+    if shutil.which("bsdtar"):
+        cmds.append(["bsdtar", "-xOf", archive, "".join("\\" + ch if ch in "[]*?\\" else ch for ch in name)])
+    for cmd in cmds:
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        crc, n = 0, 0
+        for chunk in iter(lambda: p.stdout.read(1 << 20), b""):
+            crc, n = zlib.crc32(chunk, crc), n + len(chunk)
+        if p.wait() == 0 and n:
+            return crc
+    return None
+
+
+def crc_in_image(path, name):
+    """CRC-32 of a file at a FATX image's root."""
+    img = Fatx(path)
+    try:
+        for n, is_dir, c, size in img.entries(img.root):
+            if n.lower() == name.lower() and not is_dir:
+                return zlib.crc32(img.read_chain(c, size))
+    finally:
+        img.f.close()
+    return None
+
+
+def crc_in_tar(tar_path, s):
+    """CRC-32 of the set's XBE in an existing <set>.tar (top folder or not), or None."""
+    try:
+        with tarfile.open(tar_path) as t:
+            for m in t:
+                if m.isfile() and m.name.split("/")[-1].lower() == CHIHIRO[s].lower() and m.name.count("/") <= 1:
+                    return zlib.crc32(t.extractfile(m).read())
+    except (OSError, tarfile.TarError):
+        pass
+    return None
+
+
+def same_xbe(s, image, archive):
+    """Whether the image's XBE is the .7z dump's (None when the .7z can't be
+    read): the cores are made and tested from the dumps, and an image can be
+    another revision (VC3's GDX-0003B)."""
+    name = next((n for n in archive_names(archive) or []
+                 if n.replace("\\", "/").lower() == CHIHIRO[s].lower()), None)
+    a = crc_in_7z(archive, name) if name else None
+    return None if a is None else a == crc_in_image(image, CHIHIRO[s])
+
+
+def chihiro_images(roms, wanted):
+    """The decrypted Chihiro GD-ROM images (FATX) in roms or its board folders,
+    by set: an image whose root holds one of the games' XBEs."""
+    xbes = {CHIHIRO[s].lower(): s for s in wanted if s in CHIHIRO}
+    found = {}
+    for here in [roms] + [os.path.join(roms, d) for d in sorted(os.listdir(roms))
+                         if os.path.isdir(os.path.join(roms, d)) and not work_folder(d)]:
+        for f in sorted(os.listdir(here)):
+            if not f.lower().endswith(IMAGE_EXTS) or f.startswith("."):
+                continue
+            path = os.path.join(here, f)
+            try:
+                with open(path, "rb") as h:
+                    if h.read(4) != b"FATX":
+                        continue  # an encrypted image, or not a Chihiro one
+                img = Fatx(path)
+                try:
+                    for name, is_dir, _c, _size in img.entries(img.root):
+                        s = xbes.get(name.lower())
+                        if s and not is_dir and s not in found:
+                            found[s] = path
+                finally:
+                    img.f.close()
+            except (OSError, ValueError, struct.error) as e:
+                print(f"pack_games: {path}: {e}; skipped", file=sys.stderr)
+    return found
+
+
 def main():
     ap = argparse.ArgumentParser(description="Pack Lindbergh and Chihiro game folders as <set>.tar")
-    ap.add_argument("--roms", required=True, help="folder with the game folders (hotd4a/, vcop3/, ...) or Chihiro .7z dumps")
+    ap.add_argument("--roms", required=True, help="folder with the game folders (hotd4a/, vcop3/, ...), Chihiro .7z dumps or GD-ROM images")
     ap.add_argument("--out", help="where the .tar files go (default: beside each game folder or dump)")
+    ap.add_argument("--force", action="store_true", help="repack a Chihiro .7z or image even when its .tar is newer")
     ap.add_argument("--sets", default=",".join(SETS), help="comma-separated (default: all)")
     args = ap.parse_args()
     if args.out:
@@ -196,9 +313,34 @@ def main():
         packed.append(s)
         from_folder.add(s)
     rest = [s for s in wanted if s in CHIHIRO and s not in from_folder]
+    # A GD-ROM image first (the Crazy Taxi .7z dumps have filler), but only
+    # when its XBE is the dump's: another revision keeps the tested dump.
+    sources = chihiro_images(args.roms, rest)
     for s, archive in chihiro_dumps(args.roms, rest).items():
+        if s not in sources:
+            sources[s] = archive
+        else:
+            same = same_xbe(s, sources[s], archive)
+            if same is None:
+                print(f"pack_games: could not read {CHIHIRO[s]} in {archive} to compare it with "
+                      f"{sources[s]}; packing {s} from the .7z", file=sys.stderr)
+                sources[s] = archive
+            elif not same:
+                print(f"pack_games: {sources[s]} holds another {CHIHIRO[s]} than {archive}; "
+                      f"packing {s} from the .7z (the core was made from it)", file=sys.stderr)
+                sources[s] = archive
+    for s in [s for s in rest if s in sources]:
+        archive = sources[s]
         dst = os.path.join(args.out or os.path.dirname(archive), f"{s}.tar")
-        if os.path.exists(dst) and os.path.getmtime(dst) >= os.path.getmtime(archive):
+        if not archive.lower().endswith(".7z") and os.path.exists(dst):
+            # an image with no .7z beside it: never replace a .tar of another XBE
+            had = crc_in_tar(dst, s)
+            if had is not None and had != crc_in_image(archive, CHIHIRO[s]):
+                print(f"pack_games: {archive} holds another {CHIHIRO[s]} than {dst}; kept the .tar "
+                      f"(the core was made from it). Move the .tar away to switch.", file=sys.stderr)
+                packed.append(s)
+                continue
+        if not args.force and os.path.exists(dst) and os.path.getmtime(dst) >= os.path.getmtime(archive):
             print(f"{dst} is newer than {archive}: kept", flush=True)
             packed.append(s)
             continue
@@ -206,7 +348,14 @@ def main():
         shutil.rmtree(work, ignore_errors=True)
         print(f"unpacking {archive}", flush=True)
         try:
-            unpack_7z(archive, work)
+            if archive.lower().endswith(".7z"):
+                unpack_7z(archive, work)
+            else:
+                img = Fatx(archive)
+                try:
+                    img.extract(work)
+                finally:
+                    img.f.close()
             if not os.path.exists(os.path.join(work, mark(s))):
                 sys.exit(f"pack_games: {archive} has no {mark(s)} at its top")
             print(f"packing it -> {dst}", flush=True)
@@ -214,7 +363,7 @@ def main():
         finally:
             shutil.rmtree(work, ignore_errors=True)
         packed.append(s)
-    print(f"packed: {', '.join(packed) or 'nothing (no game folder holding disk0 or an XBE, and no Chihiro .7z)'}")
+    print(f"packed: {', '.join(packed) or 'nothing (no game folder holding disk0 or an XBE, and no Chihiro .7z or GD-ROM image)'}")
 
 
 if __name__ == "__main__":

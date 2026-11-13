@@ -234,6 +234,9 @@ afcore_input Controls::sample(SDL_Renderer *ren) {
     if (gun_button) { // player 1's in buttons, player 2's in buttons2
         if (grenade) b |= AFCORE_BUTTON3;
         if (grenade2) in.buttons2 |= AFCORE_BUTTON3;
+    } else if (gun_start) { // Start is the action button: West as well as Start
+        if (grenade) b |= AFCORE_START;
+        if (grenade2) b |= AFCORE_START2;
     }
     in.buttons = b;
     return in;
@@ -417,6 +420,10 @@ void buttons_event(const SDL_Event &e, ButtonMap &map, const fs::path &file, int
 
 bool is_gun_game(const Game &g) {
     return g.controls == GameControls::Gun || g.controls == GameControls::Turret || g.controls == GameControls::AnalogGun;
+}
+
+bool gun_start_game(const Game &g) {
+    return g.romset == "letsgoju" || g.romset == "letsgojua" || g.romset == "letsgojusp";
 }
 
 bool shows_crosshair(const Game &g) {

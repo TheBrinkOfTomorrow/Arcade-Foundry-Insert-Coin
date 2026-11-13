@@ -51,14 +51,14 @@ Play the games in full, immersive 3D.
   Windows driver support outside NVIDIA's own), so they would come later.
 - **Lindbergh games on Apple TV**, on the Apple TV 4K third generation and
   later, once their Metal graphics are done.
-- **Android.** maybe.
+- **Android.** maybe, as its own app. Android devices are planned to join
+  Game Director's races through a web page in Chrome.
 
 ## More games
 
 - **The full catalog of Lindbergh games.**
-- **Sega Chihiro games**: Virtua Cop 3, The House of the Dead III and Crazy
-  Taxi High Roller first. They are in the app already but left out of this
-  release while their last problems are fixed.
+- **More Sega Chihiro games**, after Virtua Cop 3, The House of the Dead III
+  and Crazy Taxi High Roller.
 - **Other Sega arcade boards.**
 - **Sega's early-1980s Turbo hardware**: Turbo, Subroc-3D and Buck Rogers:
   Planet of Zoom.
@@ -81,6 +81,16 @@ Play the games in full, immersive 3D.
 - **Sturdier link play**: linked cabinets check that they belong to the same
   game, and a cabinet that stops answering drops the link instead of
   freezing the others.
+- **Arcade Foundry: Game Director**, a companion app for cabinet versus
+  cabinet (VS): one Mac with your games sets up your other devices (Mac,
+  iPad, iPhone, Apple TV, Linux) for a linked race, putting a small player
+  app, Arcade Foundry: Game Cabinet, on each for the session and tidying up
+  afterwards. Later: seeing the other players' screens, a
+  spectator screen, two players on two devices for Virtua Cop, and joining
+  from an Android phone or tablet (or any device with Chrome) through a web
+  page that plays the game streamed from the Game Director.
+- **Save states for the Classic 2D games**, as the Model 1, 2 and 3 games
+  have them.
 - ideas and bug reports are welcome as GitHub issues.
 
 ## Helping

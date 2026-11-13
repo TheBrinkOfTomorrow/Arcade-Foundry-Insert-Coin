@@ -28,6 +28,7 @@ One device in the app is one cabinet seat, so a twin cabinet counts as two.
 | Game | Set | Arcade | In the app |
 | --- | --- | --- | --- |
 | Virtua Racing | `vr` | 8 | Yes, tested with 2 in the app and 4 in the core |
+| Virtua Formula | `vformula` | 8 | Yes, tested with 3 in the core |
 | Star Wars Arcade | `swa` | No | No |
 | Virtua Fighter | `vf` | No (two players on one cabinet) | No |
 | Wing War | `wingwar` | Linked cabinets for versus dogfights | Not yet |
@@ -38,9 +39,13 @@ One device in the app is one cabinet seat, so a twin cabinet counts as two.
 | --- | --- | --- | --- |
 | Daytona USA (Revision A) | `daytona` | 8 | Yes, tested with 2 in the app and 4 in the core |
 | Daytona USA (1993) | `daytona93` | 8 | No: its link works differently from Revision A's, which is the one the app speaks. Use `daytona` to link |
-| Sega Rally Championship | `srallyc` | 4 (two twin cabinets) | Yes, tested with 2 |
-| INDY 500 | `indy500` | 8 | Yes, tested with 8 in the core, not yet in the app |
-| Manx TT Superbike | `manxttc` | 8 | Yes, not tested yet |
+| Sega Rally Championship | `srallyc` | 4 (two twin cabinets) | Yes, tested with 3 (Game Director, 8 Nov 2026) |
+| INDY 500 | `indy500` | 8 | Yes, tested with 8 in the core and 3 across devices (Game Director, 8 Nov 2026) |
+| Manx TT Superbike | `manxttc` | 8 | Yes, tested with 2. Even numbers only: this is the Twin program, which pairs cabinets, so with 3 the odd one becomes a relay and the race never links |
+| Sega Touring Car Championship | `stcc` | Linked (LINK TYPE CAR 1 and up) | Yes, tested with 3 in the core |
+| Over Rev | `overrevb` | 4 | Yes, tested with 2 in the core |
+| Cyber Troopers Virtual-On | `von` | 2 (versus) | Yes, tested with 2 in the core |
+| Super GT 24h | `sgt24h` | 4 | Not yet: the cabinets link, but all of them stay on the course select |
 | Motor Raid | `motoraid` | 4 | Not yet |
 
 The other Model 2 games don't link cabinets. The fighting games, Virtua
@@ -51,17 +56,27 @@ second controller on the same device instead.
 
 | Game | Set | Arcade | In the app |
 | --- | --- | --- | --- |
-| Scud Race, Scud Race Plus | `scud`, `scudplus` | 8 | Not yet |
-| Daytona USA 2, Power Edition | `daytona2`, `dayto2pe` | 16 | Not yet |
-| Sega Rally 2 | `srally2` | 4 | Not yet |
+| Scud Race | `scud` | 8 | Yes, tested with 2 in the core |
+| Scud Race Plus | `scudplus` | 8 | Yes, not tested yet |
+| Daytona USA 2 | `daytona2` | 16 | Yes, tested with 3 in the core |
+| Daytona USA 2 Power Edition | `dayto2pe` | 16 | Yes, not tested yet |
+| Sega Rally 2 | `srally2` | 4 | Yes, tested with 2 in the core |
+| Le Mans 24 | `lemans24` | 4 | Yes, tested with 3 in the core |
+| Dirt Devils | `dirtdvls` | 4 | Yes, tested with 4 in the core |
+| Harley-Davidson & L.A. Riders | `harley` | 4 | Yes, tested with 4 in the core |
 
-The Model 3 cores already have Supermodel's network board, but it isn't
-connected to the app's link settings yet (the core turns link play down).
-Le Mans 24, Dirt Devils, Harley-Davidson & L.A. Riders, Spikeout and
-Oratorio Tangram also had a network board in the arcade, and they'll come
-with it. Until then every Model 3 game plays as a
-single cabinet. Scud Race and Daytona USA 2 are already set to a single
-cabinet the first time they start.
+The Model 3 cores link the way Supermodel does, over the same network
+protocol, so a cabinet in the app can even race one running Supermodel. The
+cabinets always wait for each other every frame, so **Frame sync** makes no
+difference for these games, and a Wi-Fi ring runs at the speed of its
+slowest link. Spikeout and Virtual-On Oratorio Tangram also had a network
+board in the arcade. Their cores can link too, but the app doesn't offer it until each
+one has been tested. Scud Race and Daytona USA 2 are set to a single cabinet
+the first time they start without a link. Le Mans 24 starts in Export
+(English, no warning screen) the first time it starts without a link. Its
+country isn't in GAME ASSIGNMENTS: at the top of the test menu press Start,
+Start, Service, Service, Start, Test, then Service picks Japan, USA, Export
+or Australia.
 
 ### Classic 2D (coming after 1.0.0)
 
@@ -151,8 +166,16 @@ and point them at each other on `127.0.0.1`. The app prints
 | Virtua Racing | GAME SYSTEM > LINK ID | MASTER on one cabinet, SLAVE on the others. The VR buttons drive the menu: red moves, blue changes, green enters. Choose EXIT, then YES to save |
 | Daytona USA | GAME SYSTEM > LINK ID and CAR NUMBER | MASTER on one cabinet, SLAVE on the others, and a different CAR NUMBER on each |
 | Sega Rally Championship | GAME ASSIGNMENTS > LINK TYPE | CAR 1 on one cabinet (the master), then CAR 2, CAR 3 and CAR 4 |
+| Sega Touring Car Championship | GAME ASSIGNMENTS > LINK TYPE | CAR 1 on one cabinet (the master), then CAR 2, CAR 3 and so on |
+| Over Rev | GAME ASSIGNMENTS > FOUNDATIONAL SETTING > LINK MAX and LINK TYPE | LINK MAX to the number of cabinets on all, then LINK TYPE MASTER CarNo.1 on one cabinet and SLAVE CarNo.2, 3 and 4 on the others |
+| Cyber Troopers Virtual-On | GAME ASSIGNMENTS > NETWORK LINK ATTRIBUTE | MASTER on one cabinet, SLAVE on the other. The boot screen says THIS IS MASTER SITE or SLAVE SITE. A cabinet that starts while the other is playing gets ENGAGE OTHER PLAYER, and the two fight |
 | INDY 500 | GAME ASSIGNMENTS > NETWORK TYPE and CABINET ID | MASTER on cabinet 1, SLAVE on the others, and a different CABINET ID (1 to 8) on each. Two cabinets with the same ID keep showing "Checking network now" |
-| Manx TT Superbike | The game's link setting in test mode | One master, and a different bike on each of the others |
+| Manx TT Superbike | GAME ASSIGNMENT > CABINET, LINK ID and BIKE COLOR/No. | CABINET TWIN on all (DELUXE hangs: that set isn't supported), MASTER on one cabinet, SLAVE on the others, and a different bike number on each. Use an even number of cabinets |
+| Scud Race, Daytona USA 2 | GAME ASSIGNMENTS > LINK ID and CAR NUMBER | MASTER on one cabinet, SLAVE on the others, and a different CAR NUMBER on each. The car number is the car you drive, whatever the cabinet's place in the ring. The boot screen then says THIS IS MASTER CONTROLLER or SLAVE MACHINE |
+| Le Mans 24 | GAME ASSIGNMENTS > COMMUNICATION MODE and Cabinet Number | MASTER on one cabinet, SLAVE on the others, and a different Cabinet Number (1 to 4) on each. A cabinet set to MASTER or SLAVE stays on a black screen until the link is up. The 24-hour race is the course for linked play |
+| Dirt Devils | GAME ASSIGNMENTS > COMMUNICATION MODE and MACHINE ID | MASTER on one cabinet, SLAVE on the others, and a different MACHINE ID (1 to 4) on each. The game starts out as SLAVE, ID 1 |
+| Harley-Davidson & L.A. Riders | NETWORK ASSIGNMENTS > COMMUNICATION, PRIVILEGE MODE and CABINET ID NUMBER | COMMUNICATION to NETWORK on all, PRIVILEGE MODE MASTER on one cabinet and SLAVE on the others, and a different CABINET ID NUMBER (1 to 4) on each. The cabinet ID picks the bike. A NETWORK cabinet waits on CHECKING NETWORK until the link is up |
+| Sega Rally 2 | GAME ASSIGNMENTS > LINK TYPE | MASTER (CAR 1) on one cabinet, then SLAVE (CAR 2), (CAR 3) and (CAR 4). LINK TYPE only shows with **Link to other cabinets** on, so turn that on first. The game then checks the network and shows TOTAL NODES and each cabinet's NODE ID |
 
 Leave test mode, and the game restarts with its new role. Each cabinet
 keeps the setting in its own save, so you only do this once. When the link
@@ -164,7 +187,11 @@ that have started race together.
 To play alone again, turn **Link to other cabinets** off and set the game
 back to a single cabinet in test mode (Virtua Racing: LINK ID to NO LINK;
 Daytona USA: the link off and a single cabinet; Sega Rally: LINK TYPE to
-NOTLINK). If you leave the
+NOTLINK; STCC: LINK TYPE to STAND ALONE; Over Rev: LINK MAX to NOT LINK;
+Virtual-On: NETWORK LINK ATTRIBUTE to NOLINK; Scud Race and Daytona USA 2: LINK ID to SINGLE; Sega Rally 2:
+LINK TYPE to STAND ALONE, set while the link is still on; Le Mans 24 and
+Dirt Devils: COMMUNICATION MODE to NO LINK; Harley-Davidson: COMMUNICATION
+to STAND-ALONE). If you leave the
 link role on with linking off, the game waits for the other cabinets and
 doesn't play.
 

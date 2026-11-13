@@ -8,7 +8,8 @@ The cores' games.toml (cores/*/games.toml, the submodules) have the facts
 about each game; the app's games.toml has the sets the app lists, in the
 library's order, and the words it shows. From them this writes:
 
-  apple/InsertCoin/Library/GameList.swift  the catalog (GameInfo.catalog) and the set names
+  kit/Sources/Library/GameList.swift       the catalog (GameInfo.catalog) and the set names (in the kit submodule:
+                                           commit it there, then move the submodule here)
   linux/game_list.h                        the Linux app's table
   scripts/game_sets.py                     build_cores.py's and rom_index.py's lists
   GAMES.md                                 the tables between its GAMES:BEGIN/END markers
@@ -28,7 +29,7 @@ import afgames  # noqa: E402
 # The core repos the app embeds (cores/arcade-foundry-cores-<name>)
 CORE_REPOS = ("model12", "model3", "classic2d", "lindbergh", "chihiro")
 # The library's platforms, in their order (Platform in Catalog.swift)
-PLATFORMS = ["classic2d", "model1", "model2", "model3", "lindbergh", "chihiro"]
+PLATFORMS = ["classic2d", "model1", "model2", "model3", "chihiro", "lindbergh", "pc"]
 # The boards whose name the detail line shows (the others are the platform's name)
 NAMED_BOARDS = {"hangon", "outrun", "xboard", "yboard", "system32", "model2a", "model2b", "model2c"}
 # The face buttons in a hint: Apple's names (GCController) and the Linux app's (SDL's)
@@ -120,6 +121,8 @@ def swift(games):
             args.append("stickY: true")
         if g["gun_button"]:
             args.append("gunButton: true")
+        if g["category"] != afgames.CATEGORY_OF_CONTROLS.get(g["controls"], "other"):
+            args.append(f"categoryOverride: .{g['category']}")  # GameInfo.category gives the rest from the controls
         lines.append(f"        GameInfo({', '.join(args)}),")
     d = afgames.swift_dict
     lines += ["    ]", "}", "", "enum GameNames {",
@@ -136,6 +139,9 @@ def swift(games):
               "    /// A Chihiro game's XBE, in its folder (set -> file).",
               "    static let chihiroXbe: [String: String] = "
               + d([(q(g["set"]), q(g["build"]["xbe"])) for g in games if g["platform"] == "chihiro"]),
+              "    /// A PC-based game's program, a path in its game folder (set -> path; PCGames).",
+              "    static let pcPrograms: [String: String] = "
+              + d([(q(g["set"]), q(g["program"])) for g in games if g["platform"] in afgames.FOLDER_PLATFORMS]),
               "}", ""]
     return "\n".join(lines)
 
@@ -173,7 +179,10 @@ def linux(games):
     lines += ["};", "", "// A Chihiro game's XBE, in its folder (set, file).",
               "inline constexpr const char *kChihiroXbe[][2] = {"]
     lines += [f"    {{{c(g['set'])}, {c(g['build']['xbe'])}}}," for g in games if g["platform"] == "chihiro"]
-    lines += ["};", ""]
+    lines += ["};", "", "// A PC-based game's program, a path in its game folder (set, path); ends with nulls.",
+              "inline constexpr const char *kPcPrograms[][2] = {"]
+    lines += [f"    {{{c(g['set'])}, {c(g['program'])}}}," for g in games if g["platform"] in afgames.FOLDER_PLATFORMS]
+    lines += ["    {nullptr, nullptr},", "};", ""]
     return "\n".join(lines)
 
 
@@ -199,7 +208,9 @@ def python(cores, games):
              "# Every set the app lists, in its order (build_cores.py --sets)",
              *afgames.py_list("SETS = ", listed),
              "# Sets left out of this release (games.toml's hidden): built only when named",
-             *afgames.py_list("HIDDEN = ", [g["set"] for g in games if g["hidden"]], brackets="{}"),
+             # an empty "{}" would be a dict, so nothing hidden writes set()
+             *(afgames.py_list("HIDDEN = ", hidden, brackets="{}") if (hidden := [g["set"] for g in games if g["hidden"]])
+               else ["HIDDEN = set()"]),
              "# Model 1 sets: the recompiler's Model 1 build (CMake M1_CORE, target m1core)",
              *afgames.py_list("MODEL1 = ", sets("model12", lambda g: g["board"] == "model1"), brackets="{}"),
              "# Model 3 sets: Arcade-Foundry-Cores-Model3 (CMake M3CORE_ROMSET)",
@@ -269,7 +280,7 @@ def games_md(games):
 
 def generate(out):
     cores, games = load()
-    out.write("apple/InsertCoin/Library/GameList.swift", swift(games))
+    out.write("kit/Sources/Library/GameList.swift", swift(games))
     out.write("linux/game_list.h", linux(games))
     out.write("scripts/game_sets.py", python(cores, games))
     for board, lines in games_md(games).items():

@@ -54,19 +54,28 @@ double picture_seconds(const std::string &platform_key);
 
 void save_picture(const fs::path &file, const uint32_t *px, int w, int h);
 
-// The pause menu over the stopped game.
-// Item 1 turns operator mode on or off (Controls::operator_mode), items 2
-// and 3 step through the screen's shape and effect (kept as this game's
-// own), item 4 opens the controller buttons (draw_buttons), item 5 the
-// wheel and pedals (draw_wheel), item 6 keeps the screen as the player's
-// own picture of the game, item 7 switches full screen.
-const int kMenuItems = 9;
+// The pause menu over the stopped game: its items, in order. Save state
+// and Load state (states.h) only for a game whose core has them, and not
+// while linked. Operator mode turns on or off (Controls::operator_mode),
+// Shape and Effect step through the screen's (kept as this game's own),
+// Controller buttons opens draw_buttons, Wheel and pedals draw_wheel,
+// Picture keeps the screen as the player's own picture of the game.
+enum class PauseItem { resume, save_state, load_state, operator_mode, shape, effect, buttons, wheel, picture, fullscreen, quit };
+
+std::vector<PauseItem> pause_items(bool states);
 
 // The pause menu's frame: the game dimmed, text at twice the size; returns
 // where the text starts.
 SDL_FPoint menu_frame(SDL_Renderer *r);
 
-void draw_pause(SDL_Renderer *r, const Game &g, int item, bool operator_mode, const Look &look);
+// `note`: a line under the items (what Save state or Load state did), or "".
+void draw_pause(SDL_Renderer *r, const Game &g, const std::vector<PauseItem> &items, int item, bool operator_mode, const Look &look,
+                const std::string &note);
+
+// Save state and Load state's slots (1 to kStateSlots) under the pause menu's
+// title, each with its date and play time; `lines[i]` describes slot i + 1.
+// The chosen slot's picture (`picture`, or null) on the right.
+void draw_slots(SDL_Renderer *r, const Game &g, bool saving, const std::vector<std::string> &lines, int row, SDL_Texture *picture);
 
 // A game's screen settings: its own (chosen in its pause menu), else every game's.
 Look game_look(const Options &o, const std::string &romset);

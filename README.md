@@ -72,7 +72,7 @@ another cabinet. See the [FAQ](FAQ.md#cabinets-and-saves).
 | macOS | `~/Library/Containers/com.<your-developer-url>.arcadefoundry.insertcoin/Data/Library/Application Support/Arcade Foundry/` (the app is sandboxed; ⇧⌘G in the Finder opens it) |
 | iPhone, iPad | the app's Application Support, `Arcade Foundry/` |
 | Apple TV | the app's Caches, `Arcade Foundry/` (the system may clear it) |
-| Linux | `~/.local/share/arcade-foundry/` (`roms/`, `games/`, `saves/`, `pictures/`, `art/`, `buttons/`) |
+| Linux | `~/.local/share/arcade-foundry/` (`roms/`, `games/`, `saves/`, `states/`, `pictures/`, `art/`, `buttons/`) |
 
 Downloaded game art is in `Art/` beside them on the Mac (`art/` on Linux), and in the app's Caches (`Arcade Foundry/Art/`) on iPhone, iPad and Apple TV.
 
@@ -300,6 +300,7 @@ home folder.
 | `--cores DIR` | Load the game cores from DIR instead of the ones built next to the app. |
 | `--fullscreen` | Start in full screen (F11 switches while it runs). |
 | `--play ROMSET` | Go straight into a game, by its MAME set name (`daytona`, `hotd4a`). |
+| `--resume` | With `--play`: start the game from its Resume slot (Settings > Resume where I left off). |
 | `--speed` | Print the speed once a second (screen fps, game fps and its share of the arcade's rate) and, when the game ends, the whole run's average and its slowest second. For speed reports: `insert-coin --play daytona --speed \| tee speed.txt`. |
 | `--no-game-thread` | Run Model 1, Model 2 and Chihiro games on the window's thread, as before. By default they run on a thread of their own, so drawing to the screen never delays the next game frame (it smooths slow machines such as a Raspberry Pi 4). |
 | `--frames N` | Quit after N game frames, run as fast as the machine goes (for tests and benchmarks; with `--speed` the total is the unthrottled speed). |
@@ -317,12 +318,13 @@ home folder.
 
 The Mac app takes options only for making videos (`--video`, see
 [Gameplay videos](#gameplay-videos-apple-platforms-only)); it shows its
-speed in the window title.
+speed in the window title, and, with Settings > Show speed on, in a corner
+over the game (for full screen).
 
 ## Design documents
 
 How the larger parts are built and why: [docs/design/](docs/design/README.md).
-It has the app's designs (its architecture, and steering wheels and pedals) and links to the
+It has the app's designs (its architecture, steering wheels and pedals, and save states) and links to the
 cores' designs in their own repositories (the Metal path for the GLES cores,
 the x86 recompiler, the Model 1, Model 2 and Model 3 cores, Model 3 speed on ARM64,
 Lindbergh, Chihiro, the Classic 2D cores and their 68000 recompiler).

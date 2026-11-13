@@ -1,6 +1,9 @@
 import Combine
 import GameController
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 /// A game's page, behind its library card: its versions (Daytona USA and
 /// Daytona USA Revision A), each played, downloaded or added from here, and
@@ -77,6 +80,13 @@ struct GameDetailView: View {
         .formStyle(.grouped)
         .navigationTitle(game.title)
         .onAppear { art.want(artSet, ArtKind.extras) }
+        // The cabinet's Resume slot from iCloud, when it was left on another device sharing it
+        .task {
+            for version in game.versions where SaveStates.resumeOn {
+                if await SaveSync.syncResume(version.id) { refresh += 1 }
+            }
+        }
+        .onChange(of: playing) { _ in refresh += 1 } // back from a game: its Resume slot changed
         #if !os(tvOS)
         .onReceive(padTimer) { _ in padTick() }
         .fileImporter(isPresented: $importing, allowedContentTypes: Storage.romTypes, allowsMultipleSelection: true) { result in
@@ -120,6 +130,12 @@ struct GameDetailView: View {
 
     /// What choosing the version does: play, download, or say why not.
     private func activate(_ version: GameInfo) {
+        if PCGames.isPC(version.id) { // a PC-based game: its runner and game folder
+            if !CoreLibrary.exists(version.id) { message = "\(version.id): \(CoreLibrary.unavailable(version.id))." }
+            else if ready(version) { playing = version }
+            else { message = "Choose its game folder first." }
+            return
+        }
         if CoreLibrary.load(version.id) == nil {
             message = "\(version.id): \(CoreLibrary.unavailable(version.id))."
         } else if ready(version) {
@@ -131,6 +147,19 @@ struct GameDetailView: View {
         } else if downloading == nil {
             download(version)
         }
+    }
+
+    /// The version from its Resume slot (SaveStates), where it was left.
+    private func resume(_ version: GameInfo) {
+        guard CoreLibrary.load(version.id) != nil, ready(version) else { return activate(version) }
+        SaveStates.resumeNext = version.id
+        playing = version
+    }
+
+    /// Its Resume slot's date and play time, when it has one to offer.
+    private func resumeNote(_ version: GameInfo, _ core: CoreLibrary?) -> String? {
+        guard SaveStates.canResume(version.id, library: core) else { return nil }
+        return "Where you left off: " + SaveStates.describe(SaveStates.slot(version.id, 0), coreVersion: core?.version ?? "")
     }
 
     private func download(_ version: GameInfo) {
@@ -163,20 +192,87 @@ struct GameDetailView: View {
         } else {
             status = "Download from your ROM server"
         }
-        return Button { activate(version) } label: {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(version.detail).font(.title3)
-                    Text(version.id).font(.callout).foregroundStyle(.secondary)
+        let note = ready(version) ? resumeNote(version, core) : nil
+        return VStack(spacing: 8) {
+            if let note { // Resume, above Play
+                Button { resume(version) } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Resume \(version.detail)").font(.title3)
+                            Text(note).font(.callout).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Label("Resume", systemImage: "playpause.fill")
+                    }
+                    .padding(.vertical, 12)
                 }
-                Spacer()
-                Label(status, systemImage: ready(version) ? "play.fill" : "arrow.down.circle")
             }
-            .padding(.vertical, 12)
+            Button { activate(version) } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(version.detail).font(.title3)
+                        Text(version.id).font(.callout).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Label(note == nil ? status : "Play from the start", systemImage: ready(version) ? "play.fill" : "arrow.down.circle")
+                }
+                .padding(.vertical, 12)
+            }
         }
     }
     #else
     @ViewBuilder private func row(_ version: GameInfo) -> some View {
+        if PCGames.isPC(version.id) { pcRow(version) } else { coreRow(version) }
+    }
+
+    /// A PC-based game (PCGames, Mac only): its game folder, chosen where it
+    /// is and never copied, and Play, which starts its runner.
+    @ViewBuilder private func pcRow(_ version: GameInfo) -> some View {
+        let folder = PCGames.folder(version.id)
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(version.detail).font(.title3)
+                Text(folder.map { "Game folder: \($0.path)" } ?? "Game folder: not chosen").font(.callout).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if PCGames.runner(version.id) == nil {
+                Text(CoreLibrary.unavailable(version.id)).font(.caption).foregroundStyle(.secondary)
+            } else {
+                #if os(macOS)
+                Button(folder == nil ? "Choose Game Folder…" : "Change…") { chooseFolder(version) }
+                    .buttonStyle(.borderless)
+                #endif
+                if folder != nil {
+                    Button { playing = version } label: { Label("Play", systemImage: "play.fill") }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                }
+            }
+        }
+        .padding(.vertical, 10)
+    }
+
+    #if os(macOS)
+    private func chooseFolder(_ version: GameInfo) {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        let program = PCGames.program(version.id)
+        panel.message = "Choose the folder that holds \(version.title)" + (program.isEmpty ? "" : " (\(program))")
+        panel.prompt = "Choose"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try PCGames.choose(url, for: version.id)
+            message = nil
+        } catch {
+            message = error.localizedDescription
+        }
+        refresh += 1
+    }
+    #endif
+
+    @ViewBuilder private func coreRow(_ version: GameInfo) -> some View {
         let core = CoreLibrary.load(version.id)
         let rom = Storage.rom(version.id)
         let inCloud = cloud.items[version.id]
@@ -209,9 +305,19 @@ struct GameDetailView: View {
                         .foregroundStyle(.secondary)
                         .help(inCloud.downloaded ? "In iCloud Drive, downloaded" : "In iCloud Drive: downloads when you play")
                 }
-                Button { playing = version } label: { Label("Play", systemImage: "play.fill") }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
+                if let note = resumeNote(version, core) {
+                    Button { resume(version) } label: { Label("Resume", systemImage: "playpause.fill") }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .help(note)
+                    Button { playing = version } label: { Label("Play from the start", systemImage: "play.fill") }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                } else {
+                    Button { playing = version } label: { Label("Play", systemImage: "play.fill") }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                }
             }
         }
         .padding(.vertical, 10)

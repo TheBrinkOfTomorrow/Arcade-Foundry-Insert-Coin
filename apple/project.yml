@@ -14,11 +14,11 @@ configFiles:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "1.2.0" # x.y.z, the same as linux/CMakeLists.txt
+    MARKETING_VERSION: "1.3.0" # x.y.z, the same as linux/CMakeLists.txt
     CURRENT_PROJECT_VERSION: "1"
     PRODUCT_NAME: Arcade Foundry Insert Coin # the .app file name: no colon allowed, the display name below has it
     PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID) # Signing.xcconfig, or yours in Local.xcconfig
-    SWIFT_OBJC_BRIDGING_HEADER: InsertCoin/Core/Bridging.h
+    SWIFT_OBJC_BRIDGING_HEADER: ../kit/Sources/Core/Bridging.h # the kit (kit/, Arcade-Foundry-IC-Kit-devel)
     HEADER_SEARCH_PATHS: $(SRCROOT)/../cores/arcade-foundry-cores-common/include
 targetTemplates:
   App:
@@ -29,6 +29,9 @@ targetTemplates:
       # CFBundle reads Info-macOS.plist (unexpanded) instead of Info.plist.
       - path: InsertCoin
         excludes: ["Support/Info-*.plist"]
+      # The engine Insert Coin shares with Game Cabinet: the kit submodule,
+      # compiled into this app's own module.
+      - path: ../kit/Sources
       # Each game's history for its page (history/<romset>.md), as a folder.
       - path: ../history
         type: folder
@@ -44,7 +47,8 @@ targetTemplates:
         basedOnDependencyAnalysis: false
         script: |
           set -e
-          SRC="$SRCROOT/../build/cores/$PLATFORM_NAME"
+          # AF_CORES_DIR (a build setting) points at another folder of cores.
+          SRC="${AF_CORES_DIR:-$SRCROOT/../build/cores}/$PLATFORM_NAME"
           DST="$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH"
           mkdir -p "$DST"
           for fw in "$SRC"/afcore_*.framework; do

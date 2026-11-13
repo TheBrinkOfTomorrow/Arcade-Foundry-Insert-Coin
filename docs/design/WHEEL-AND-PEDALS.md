@@ -227,7 +227,7 @@ the shifter and the paddle numbers still need to be confirmed on the wheel.
 
 - **Linux:** done. See `linux/wheel.h`, `linux/wheel.cpp`, `Controls` in
   `linux/input.*` and the event loops in `main.cpp` and `session.cpp`.
-- **macOS (built, to test on the wheels):** `apple/InsertCoin/Input/Wheel.swift`
+- **macOS (built, to test on the wheels):** [`Input/Wheel.swift`](https://github.com/TheBrinkOfTomorrow/Arcade-Foundry-IC-Kit/blob/main/Sources/Input/Wheel.swift) (in the kit)
   reads every Logitech wheel through IOKit HID (`IOHIDManager`), the G29
   included, so setup, calibration and buttons work the same everywhere.
   Apple's `GCRacingWheel` only knows the G29, G920 and G923, so it is not

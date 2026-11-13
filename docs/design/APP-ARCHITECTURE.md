@@ -127,7 +127,7 @@ release; there are no other code flags for it.
 The library groups versions of one game (Daytona USA and its Revision A)
 into one card per title and board. It can show all games or only the
 playable ones, filter by platform (Classic 2D, Model 1, Model 2, Model
-3, Lindbergh, Chihiro), and sort A-Z, by year, by platform or by
+3, Chihiro, Lindbergh, PC based), and sort A-Z, by year, by platform or by
 recently played. Each game has a page with its versions, each version's
 own settings, its controls and a short history (`history/<set>.md`,
 shown as About this game).
@@ -147,6 +147,12 @@ A stamp file beside each core records the ROM set, the core repository's
 commit and the script's version it was built from, so an unchanged core
 is skipped. Everything under `build/` is derived from ROMs and is never
 committed.
+
+When ccache is installed, every compile goes through it (Model12 #46): the
+sets of one board share most of their sources, and a core rebuilt after a
+recompiler change that left its generated code alone takes seconds (Rail
+Chase 2: 196 s cold, 151 s after another Model 2 set, 10 s unchanged, on 4
+cores). `--no-ccache` turns it off.
 
 The Apple build copies whatever is in `build/cores/<platform>/` into the
 app and signs it with the app. The Linux app looks for cores beside its
@@ -194,7 +200,8 @@ and its screen.
   the game's own screen settings, controller buttons, full screen, use
   this screen as the game's picture, quit.
 - **Speed readout.** Screen and game frames a second: the Mac's window
-  title; on iPhone, iPad and Apple TV over the game when Show speed is
+  title, and over the game (top right) when Show speed is on, for full
+  screen; on iPhone, iPad and Apple TV over the game when Show speed is
   on; on Linux the window title, and a corner box in full screen.
 
 ### Cabinets and saves
@@ -250,6 +257,74 @@ a ROM server on the home network (any web server; the repository's
 Drive, so it uses the ROM server. A downloaded set is checked with the
 core's `check_roms` before it is used. The ROM server document covers
 the rest.
+
+### PC-based games
+
+Every Sega game after Lindbergh runs on a Windows PC board: RingWide,
+RingEdge, Europa-R, the Sega Amusements PC games (Daytona Championship
+USA) and ALLS. Their cores are WinPC (32-bit) and ALLS (64-bit); both
+translate the game's x86 code ahead of time like Lindbergh and Chihiro,
+and put a Windows layer, DXVK for Direct3D and SDL3 under it (each core's
+design document). The app treats them as one group (11 Nov 2026;
+#452). Until a release is assigned they are `hidden` in `games.toml`.
+
+- **One app, not a launcher per game.** They are normal cards, under one
+  more library filter, **PC based**; each game's page names its real
+  board. A board that grows big can get a filter of its own later.
+  Separate launchers would each need their own controls, wheel support,
+  saves, pause menu, link play and art, and their own signing and updates.
+- **A game folder, not a ROM set.** These dumps are folders of files, up
+  to 12 GB, so nothing is copied into the app. Each card has a **Game
+  folder** field with a Choose button that points at the dump where it is.
+  The core's `games.toml` lists the files that must be in it (the game's
+  program first); the card says which are missing. On the Mac the folder
+  is kept as a security-scoped bookmark (the app is sandboxed and already
+  has the user-selected read-only entitlement); on Linux it is
+  `folder/<set>` in the data folder, or `--game-folder` for one run. The
+  game folder is only read: anything the game writes (its settings, logs,
+  records) goes to `Saves/<set>/`, so saves stay per cabinet and backed up
+  as for every other game.
+- **Built on the player's machine.** build_cores.py translates the game's
+  program from the dump, as for every other board; the result is the game's
+  runner, `afgame_<set>`, in `build/cores/<platform>/`. The stamp beside it
+  records the program's hash, so a game folder holding a different version
+  of the game is refused with a message rather than crashing.
+- **Each game in its own process.** The app starts the runner as a child
+  process, with one contract for every PC-based core:
+  `afgame_<set> --game-dir DIR --saves DIR [--fullscreen] [--display N]
+  [--settings FILE]`, where the settings file holds the game's button map,
+  wheel settings, region and cabinet name. The library stays up while the
+  game runs. When the runner ends, the app comes back to the library; a
+  non-zero exit shows the runner's last `error:` line, as a core's `error`
+  is shown today. A crash or a leak in a large PC game never takes the
+  library down.
+- **First version: the runner's own window.** The runner opens its own
+  full-screen SDL3 window on the app's display and reads the controllers
+  itself through SDL3, from the settings the app passes; Escape or Options
+  and Menu together end the game. Later the runner draws into a GPU surface
+  the app shows in its own game window (an IOSurface on the Mac, a dma-buf
+  on Linux), which brings back the app's pause menu, screen settings and
+  speed readout for these games.
+- **On the Mac,** the runner is inside the app bundle (`Contents/Helpers`),
+  signed with the app with the sandbox and `com.apple.security.inherit`
+  entitlements, so it runs in the app's sandbox. The app starts access to
+  the game folder's bookmark before starting the runner; whether the child
+  gets that access with the sandbox, or needs the bookmark passed to it, is
+  to be checked on the first Mac run. DXVK and the Mac's Vulkan driver
+  (KosmicKrisp, with our patches) are copied into the bundle beside it,
+  and on Linux ship beside the runner; DXVK's shader cache goes under
+  `--saves`. Games whose attract movies need ffmpeg (SWDC) find it on the
+  system or play without movies; bundling it is a later choice.
+- **Building takes a while.** Translating one of these games is minutes,
+  not seconds (SWDC: 10 to 15 minutes on an M4 Pro Mac mini), so
+  build_cores.py says so before it starts one.
+- **Controls the PC games add,** such as SWDC's "tap card" to log in with
+  the stand-in Aime card, go into each game's controls list like any other.
+- **macOS and Linux first,** x86-64 Linux with a desktop GPU (not the
+  Raspberry Pi). iPad and Apple TV come later only for games that turn out
+  light enough, game by game, and are never promised.
+- **The standalone runners** (`alls-run`, `winpc-run`, `swdc-mac.sh`) stay
+  developer tools for testing a core without the app.
 
 ### Library pictures and game art
 
@@ -330,12 +405,16 @@ A game's own screen settings win over every game's.
 
 **Apple** (`apple/`): one SwiftUI app, three targets (macOS, iOS and
 iPadOS, tvOS) over the same sources, generated by XcodeGen from
-`apple/project.yml`. The source folders follow the parts above:
-`Library/` (catalog, library, game pages, settings, cabinets, ROM sync,
-packages, pictures, credits), `Session/` (the session and link
+`apple/project.yml`. Most of the engine lives in the kit, the
+[Arcade-Foundry-IC-Kit-devel](https://github.com/TheBrinkOfTomorrow/Arcade-Foundry-IC-Kit) submodule at `kit/`,
+which Game Cabinet (the Game Director's player) compiles in too. Its
+folders follow the parts above: `Library/` (catalog, settings, cabinets,
+ROM sync, packages, pictures, game art), `Session/` (the session and link
 discovery), `Core/` (loading cores), `Render/` (the screen and its
-settings), `Audio/`, `Input/`, `Video/` (gameplay videos), `VR/`
-(headset play). Signing and the bundle ID come from `Local.xcconfig`,
+settings), `Audio/`, `Input/`, `Video/` (gameplay videos), `VR/` (headset
+play) and `Play/` (the game window and its pause menu). What only Insert
+Coin has stays in `apple/InsertCoin/`: the app itself, the library, game
+pages, the cabinets screen, credits and the splash. Signing and the bundle ID come from `Local.xcconfig`,
 which each builder keeps for themselves.
 
 **Linux** (`linux/`): one SDL3 program, `insert-coin`, drawn with SDL's
@@ -375,6 +454,7 @@ still checked on Linux.
 | Saves backed up | iCloud, per cabinet | iCloud, per cabinet | iCloud, per cabinet | no |
 | Lindbergh | yes | paid developer team | no | yes |
 | Chihiro | yes | no | no | yes |
+| PC based (not yet released) | yes | later, game by game | later, game by game | x86-64 |
 
 - **Apple builds are personal sideloads.** Nothing goes to the App Store
   or TestFlight: the cores are built from the user's ROMs, and the
@@ -428,7 +508,6 @@ still checked on Linux.
 
 ## Open items
 
-- Model 3 link play (the cores' NetBoard wired to `link_start`).
 - Lindbergh on Apple TV and the Metal renderer as the default for
   Lindbergh and Chihiro on Apple devices.
 - Chihiro on iOS and iPadOS.
@@ -441,6 +520,9 @@ still checked on Linux.
 - Headset play: GPU stereo at 90 Hz, gestures, a standalone visionOS app,
   and other headsets.
 - Windows (#296).
+- PC-based games (#452): the Linux and Apple game-folder setting and
+  runner launch, build_cores.py building each runner, then frames in the
+  app's own window and its pause menu.
 - Game art: the Arcade Database's terms ask for contact with its author
   before release (#352).
 
@@ -478,6 +560,9 @@ still checked on Linux.
 - **Game art is downloaded on the player's device, never shipped,**
   because it is Sega's (#352). The player's own picture always wins over
   it, and the art is never updated once kept.
+- **PC-based games are one group in one app** (#452): a PC based
+  filter, a game folder that is pointed at and never copied, and each game
+  in its own runner process, not a launcher per game.
 - **Dark appearance by default,** with Light and Match the system as
   choices; the Linux menus are always dark.
 - **Private `-devel` repositories and public release repositories,** one

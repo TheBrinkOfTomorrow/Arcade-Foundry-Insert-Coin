@@ -3,7 +3,7 @@
 # The game cores come from scripts/build_cores.py (build/cores/linux), and
 # SDL from the recompiler's pinned copy (its scripts/setup.py fetches it).
 cmake_minimum_required(VERSION 3.20)
-project(insert_coin VERSION 1.2.0 LANGUAGES C CXX) # x.y.z, the same as apple/project.yml
+project(insert_coin VERSION 1.3.0 LANGUAGES C CXX) # x.y.z, the same as apple/project.yml
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(NOT CMAKE_BUILD_TYPE)
@@ -27,7 +27,7 @@ if(NOT EXISTS ${COMMON}/CMakeLists.txt)
 endif()
 add_subdirectory(${COMMON} ${CMAKE_BINARY_DIR}/common EXCLUDE_FROM_ALL)
 
-add_executable(insert-coin main.cpp library.cpp session.cpp input.cpp render.cpp wheel.cpp art.cpp)
+add_executable(insert-coin main.cpp library.cpp session.cpp states.cpp input.cpp render.cpp wheel.cpp art.cpp runner.cpp)
 target_compile_definitions(insert-coin PRIVATE INSERT_COIN_VERSION="${PROJECT_VERSION}")
 # The credits (CREDITS.md), built in for the credits screen and --credits.
 set(CREDITS_FILE ${CMAKE_CURRENT_SOURCE_DIR}/../CREDITS.md)
@@ -45,7 +45,9 @@ foreach(HISTORY_FILE ${HISTORY_FILES})
 endforeach()
 configure_file(history.h.in ${CMAKE_BINARY_DIR}/generated/history.h @ONLY)
 target_include_directories(insert-coin PRIVATE ${CMAKE_BINARY_DIR}/generated)
-target_link_libraries(insert-coin PRIVATE afc::afcommon afc::afcore SDL3::SDL3-static ${CMAKE_DL_LIBS})
+# Save states are kept deflated (states.cpp): zlib (zlib1g-dev, zlib-devel).
+find_package(ZLIB REQUIRED)
+target_link_libraries(insert-coin PRIVATE afc::afcommon afc::afcore SDL3::SDL3-static ZLIB::ZLIB ${CMAKE_DL_LIBS})
 # Game art downloads (art.h) need libcurl (libcurl4-openssl-dev, libcurl-devel);
 # without it the app builds and shows the screens from the games instead.
 find_package(CURL)

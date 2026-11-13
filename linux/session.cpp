@@ -1,7 +1,10 @@
 #include "session.h"
+
+#include "runner.h"
 #include "art.h"
 #include "library.h"
 #include "render.h"
+#include "states.h"
 
 #include "afcommon/tar.h"
 
@@ -16,6 +19,17 @@
 namespace insert_coin {
 
 namespace {
+
+// Tells the player why a game didn't start or stopped: a message box, or
+// for Game Cabinet (o.report) the report, which its Game Director reads.
+void tell(const Options &o, const std::string &text) {
+    if (o.report) {
+        std::fprintf(stderr, "insert-coin: %s\n", text.c_str());
+        o.report->fail(text);
+    } else {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Arcade Foundry: Insert Coin", text.c_str(), nullptr);
+    }
+}
 
 // The game's sound streams (the sound board's two, Star Wars Arcade's
 // Digital Sound Board), each at its own rate, into SDL audio
@@ -35,16 +49,24 @@ struct Audio {
             if (streams[s]) SDL_BindAudioStream(dev, streams[s]);
         }
     }
-    void push(const afcore_api *api, afcore *core) {
+    // `sound`: Game Cabinet's copy of each batch (PlayReport::on_sound).
+    void push(const afcore_api *api, afcore *core, PlayReport *report = nullptr) {
         static float buf[2 * 4096];
         for (int s = 0; s < 3; ++s) {
             size_t n;
-            while ((n = api->audio_read(core, s, buf, 4096)) > 0)
+            while ((n = api->audio_read(core, s, buf, 4096)) > 0) {
                 if (streams[s]) SDL_PutAudioStreamData(streams[s], buf, int(n * 2 * sizeof(float)));
+                if (report && report->on_sound) report->on_sound(s, api->audio_rate(core, s), buf, n);
+            }
             // A stall (window drag): drop the backlog rather than lag behind.
             if (streams[s] && SDL_GetAudioStreamQueued(streams[s]) > int(api->audio_rate(core, s) * 8 * 0.25))
                 SDL_ClearAudioStream(streams[s]);
         }
+    }
+    // A state was loaded: what was queued is from before it.
+    void clear() {
+        for (SDL_AudioStream *s : streams)
+            if (s) SDL_ClearAudioStream(s);
     }
     void close() {
         for (SDL_AudioStream *&s : streams)
@@ -98,7 +120,7 @@ fs::path game_folder(SDL_Renderer *r, const Game &g, const Options &o) {
     show(0);
     const std::string err = unpack_tar(g.rom, g.romset, required, dst, show);
     if (!err.empty()) {
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Arcade Foundry: Insert Coin", err.c_str(), nullptr);
+        tell(o, err);
         return {};
     }
     if (std::FILE *f = std::fopen(stamp.c_str(), "w")) {
@@ -184,7 +206,11 @@ struct GpuScreens {
 
 } // namespace
 
-bool play(SDL_Renderer *r, const Game &g, const Options &o, Controls &ctl) {
+bool play(SDL_Renderer *r, const Game &g, const Options &o, Controls &ctl, bool resume) {
+    if (g.pc) { // a PC-based game: its runner, in a process of its own
+        play_pc_game(r, g, o);
+        return true;
+    }
     char err[512] = "";
     const fs::path rom = g.folder ? game_folder(r, g, o) : g.rom;
     if (rom.empty()) return true;
@@ -199,18 +225,31 @@ bool play(SDL_Renderer *r, const Game &g, const Options &o, Controls &ctl) {
     afcore *core = g.api->create(rom.c_str(), saves.c_str(), err, sizeof err);
     gl.take();
     if (!core) {
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Arcade Foundry: Insert Coin", err, nullptr);
+        tell(o, err);
         return true;
     }
+    if (o.report) o.report->started = true;
     mark_played(o.data, g.romset);
     if (o.link_port > 0 && g.api->link_start(core, o.link_port, o.link_next.c_str(), o.link_sync, err, sizeof err) != 0)
         std::fprintf(stderr, "insert-coin: %s\n", err);
+    // Save states (states.h): not while linked (the other cabinets can't go
+    // back with this one), nor for Game Cabinet (its Game Director's games are linked).
+    const bool states = has_states(g.api) && o.link_port <= 0 && !o.report;
+    if (states && resume) {
+        gl.release();
+        const std::string why = load_slot(o, g, core, 0);
+        gl.take();
+        if (!why.empty()) tell(o, "The game starts from the beginning: its Resume slot didn't load.\n" + why);
+    } else if (states) {
+        remove_slot(o, g, 0); // played from power-on, the saves move on past it
+    }
     ctl.flight = g.flight;
     ctl.drive = g.controls == GameControls::Drive;
     ctl.twin = g.twin;
     ctl.analog_gun = g.analog_gun;
     ctl.gun = is_gun_game(g);
     ctl.gun_button = g.gun_button;
+    ctl.gun_start = gun_start_game(g);
     ctl.crosshair = shows_crosshair(g) && crosshair_on(o, g.romset);
     ctl.aim_x = ctl.aim_y = ctl.aim2_x = ctl.aim2_y = 0.5f;
     ctl.second_joined = false;
@@ -251,9 +290,31 @@ bool play(SDL_Renderer *r, const Game &g, const Options &o, Controls &ctl) {
             save_picture(own ? o.data / "pictures" / "own" / (g.romset + ".bmp") : picture, px, w, h);
         }
     };
-    bool running = true, quit = false;
+    bool running = true, quit = false, failed = false;
     bool paused = false; // the pause menu is open
     int item = 0;
+    const std::vector<PauseItem> items = pause_items(states);
+    int slots = 0;        // Save state (1) or Load state (2) is open: its slots
+    int slot_row = 0;     // the slot chosen there
+    std::vector<std::string> slot_lines; // each slot's date and play time
+    SDL_Texture *slot_picture = nullptr; // the chosen slot's screen
+    std::string note;     // under the pause menu: what Save state or Load state did
+    const auto show_slots = [&](int mode) {
+        slots = mode;
+        slot_row = 0;
+        slot_lines.clear();
+        for (int s = 1; s <= kStateSlots; ++s) slot_lines.push_back(read_slot(o, g, s).describe());
+    };
+    const auto pick_picture = [&] {
+        if (slot_picture) SDL_DestroyTexture(slot_picture);
+        slot_picture = nullptr;
+        const StateSlot s = read_slot(o, g, slot_row + 1);
+        if (s.picture.empty()) return;
+        if (SDL_Surface *bmp = SDL_LoadBMP(s.picture.c_str())) {
+            slot_picture = SDL_CreateTextureFromSurface(r, bmp);
+            SDL_DestroySurface(bmp);
+        }
+    };
     int button_row = -1;   // the controller buttons are open (draw_buttons): the row picked
     bool waiting = false;  // for the button to put on that row
     WheelScreen wheel_screen; // Wheel and pedals (wheel.h), open from the pause menu
@@ -317,7 +378,7 @@ bool play(SDL_Renderer *r, const Game &g, const Options &o, Controls &ctl) {
                 worker_done = true;
                 return;
             }
-            audio.push(g.api, core);
+            audio.push(g.api, core, o.report);
             if (++played == long(hz * picture_after) && o.frames == 0 && !has_picture) keep_screen(false);
             int w = 0, h = 0;
             if (const uint32_t *px = g.api->screen(core, &w, &h)) {
@@ -328,6 +389,7 @@ bool play(SDL_Renderer *r, const Game &g, const Options &o, Controls &ctl) {
             }
             int id = 0, count = 0;
             const int link = o.link_port > 0 ? g.api->link_state(core, &id, &count) : AFCORE_LINK_OFF;
+            if (o.report && o.link_port > 0) o.report->link = link, o.report->link_id = id, o.report->link_count = count;
             if (link != last_link && o.link_port > 0) {
                 static const char *names[] = {"off (set it in the game's test mode)", "waiting", "up", "lost"};
                 if (link == AFCORE_LINK_UP) std::printf("insert-coin: link up, cabinet %d of %d\n", id, count);
@@ -356,6 +418,11 @@ bool play(SDL_Renderer *r, const Game &g, const Options &o, Controls &ctl) {
         if (paused) std::snprintf(title, sizeof title, "%s \u2014 %.0f fps \u00b7 paused", g.title.c_str(), screen);
         else std::snprintf(title, sizeof title, "%s \u2014 %.0f fps \u00b7 game %.1f fps (%.0f%%)", g.title.c_str(), screen, game, 100 * game / hz);
         SDL_SetWindowTitle(win, o.show_speed ? title : g.title.c_str());
+        if (o.report) {
+            o.report->fps = screen;
+            o.report->game_fps = paused ? 0 : game;
+            o.report->speed_pct = paused ? 0 : 100 * game / hz;
+        }
         char text[128]; // the debug font is ASCII only
         if (paused) std::snprintf(text, sizeof text, "%.0f fps - paused", screen);
         else std::snprintf(text, sizeof text, "%.0f fps - game %.1f fps (%.0f%%)", screen, game, 100 * game / hz);
@@ -370,6 +437,10 @@ bool play(SDL_Renderer *r, const Game &g, const Options &o, Controls &ctl) {
         stats_presents = stats_frames = 0;
     };
     while (running) {
+        if (o.report) {
+            if (o.report->stop) { running = false; break; }
+            o.report->paused = paused;
+        }
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) { running = false; quit = true; }
@@ -390,39 +461,72 @@ bool play(SDL_Renderer *r, const Game &g, const Options &o, Controls &ctl) {
                 wheel_event(e, ctl.wheel, wheel_screen);
                 continue;
             }
+            if (paused && slots) { // Save state or Load state's slots
+                if (is(SDL_SCANCODE_UP, SDL_GAMEPAD_BUTTON_DPAD_UP)) slot_row = std::max(0, slot_row - 1), pick_picture();
+                if (is(SDL_SCANCODE_DOWN, SDL_GAMEPAD_BUTTON_DPAD_DOWN)) slot_row = std::min(kStateSlots - 1, slot_row + 1), pick_picture();
+                if (is(SDL_SCANCODE_ESCAPE, SDL_GAMEPAD_BUTTON_EAST) || (key && e.key.scancode == SDL_SCANCODE_BACKSPACE)) {
+                    slots = 0;
+                } else if (is(SDL_SCANCODE_RETURN, SDL_GAMEPAD_BUTTON_SOUTH)) {
+                    const int slot = slot_row + 1;
+                    gl.release();
+                    std::string why;
+                    if (slots == 1) {
+                        int w = 0, h = 0;
+                        const uint32_t *px = played > 0 ? g.api->screen(core, &w, &h) : nullptr;
+                        why = save_slot(o, g, core, slot, px, w, h);
+                    } else {
+                        why = load_slot(o, g, core, slot);
+                    }
+                    gl.take();
+                    note = !why.empty() ? why : slots == 1 ? "Saved in slot " + std::to_string(slot) : "";
+                    if (why.empty() && slots == 2) { // back in the game, at that frame
+                        paused = false;
+                        audio.clear();
+                        if (audio.dev) SDL_ResumeAudioDevice(audio.dev);
+                    }
+                    slots = 0;
+                }
+                continue;
+            }
             const bool chord = padb && (e.gbutton.button == SDL_GAMEPAD_BUTTON_START || e.gbutton.button == SDL_GAMEPAD_BUTTON_BACK) && ctl.chord_down();
             const bool wheel_pause = e.type == SDL_EVENT_JOYSTICK_BUTTON_DOWN && ctl.wheel.joy && e.jbutton.which == ctl.wheel.id &&
                                      ctl.wheel.s.button[kWPause] >= 0 && e.jbutton.button == ctl.wheel.s.button[kWPause];
             if (chord || wheel_pause || (key && e.key.scancode == SDL_SCANCODE_ESCAPE)) {
                 paused = !paused;
                 item = 0;
+                note.clear();
                 button_row = -1;
                 wheel_screen.row = -1;
                 if (paused) end_worker(), g.api->save(core);
                 if (audio.dev) { if (paused) SDL_PauseAudioDevice(audio.dev); else SDL_ResumeAudioDevice(audio.dev); }
             } else if (paused) {
                 if (is(SDL_SCANCODE_UP, SDL_GAMEPAD_BUTTON_DPAD_UP)) item = std::max(0, item - 1);
-                if (is(SDL_SCANCODE_DOWN, SDL_GAMEPAD_BUTTON_DPAD_DOWN)) item = std::min(kMenuItems - 1, item + 1);
+                if (is(SDL_SCANCODE_DOWN, SDL_GAMEPAD_BUTTON_DPAD_DOWN)) item = std::min(int(items.size()) - 1, item + 1);
                 const bool back = is(SDL_SCANCODE_BACKSPACE, SDL_GAMEPAD_BUTTON_EAST);
                 const bool pick = is(SDL_SCANCODE_RETURN, SDL_GAMEPAD_BUTTON_SOUTH);
-                if (pick && item == 4) {
+                const PauseItem it = items[size_t(item)];
+                if (pick || back) note.clear();
+                if (pick && it == PauseItem::buttons) {
                     button_row = 0;
                     waiting = false;
-                } else if (pick && item == 5) {
+                } else if (pick && it == PauseItem::wheel) {
                     wheel_screen.start();
-                } else if (pick && (item == 2 || item == 3)) { // the menu stays open to see the change
-                    if (item == 2) look.shape = Shape((int(look.shape) + 1) % 3);
+                } else if (pick && (it == PauseItem::save_state || it == PauseItem::load_state)) {
+                    show_slots(it == PauseItem::save_state ? 1 : 2);
+                    pick_picture();
+                } else if (pick && (it == PauseItem::shape || it == PauseItem::effect)) { // the menu stays open to see the change
+                    if (it == PauseItem::shape) look.shape = Shape((int(look.shape) + 1) % 3);
                     else look.effect = Effect((int(look.effect) + 1) % 3);
                     save_look(o, g.romset, look);
-                } else if (pick && item == 7) {
+                } else if (pick && it == PauseItem::fullscreen) {
                     set_fullscreen(win, !g_fullscreen, o.data);
                 } else if (back || pick) {
-                    if (!back && item == 1) {
+                    if (!back && it == PauseItem::operator_mode) {
                         ctl.operator_mode = !ctl.operator_mode;
                         ctl.operator_armed = false;
                     }
-                    if (!back && item == 6) keep_screen(true);
-                    if (!back && item == 8) running = false;
+                    if (!back && it == PauseItem::picture) keep_screen(true);
+                    if (!back && it == PauseItem::quit) running = false;
                     paused = false;
                     if (audio.dev) SDL_ResumeAudioDevice(audio.dev);
                 }
@@ -438,14 +542,16 @@ bool play(SDL_Renderer *r, const Game &g, const Options &o, Controls &ctl) {
                 wheel_tick(ctl.wheel, wheel_screen);
                 draw_wheel(r, ctl.wheel, wheel_screen);
             }
-            else draw_pause(r, g, item, ctl.operator_mode, look);
+            else if (slots) draw_slots(r, g, slots == 1, slot_lines, slot_row, slot_picture);
+            else draw_pause(r, g, items, item, ctl.operator_mode, look, note);
             SDL_RenderPresent(r);
             count_speed(0);
             continue;
         }
         if (threaded) {
             if (!worker.joinable() && !worker_done) worker = std::thread(worker_loop);
-            const afcore_input in = ctl.sample(r);
+            afcore_input in = ctl.sample(r);
+            if (o.report) o.report->take(in);
             bool fresh = false;
             {
                 std::lock_guard<std::mutex> lock(shared_m);
@@ -458,6 +564,7 @@ bool play(SDL_Renderer *r, const Game &g, const Options &o, Controls &ctl) {
                         tex_h = shared_h;
                     }
                     SDL_UpdateTexture(pixel_tex, nullptr, shared_px.data(), shared_w * 4);
+                    if (o.report && o.report->on_screen) o.report->on_screen(shared_px.data(), shared_w, shared_h);
                     tex = pixel_tex;
                     shown_seq = shared_seq;
                     fresh = true;
@@ -468,7 +575,8 @@ bool play(SDL_Renderer *r, const Game &g, const Options &o, Controls &ctl) {
                 running = false;
                 if (!worker_error.empty()) {
                     const std::string text = g.title + " stopped: its core can't run this yet.\n" + worker_error;
-                    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Arcade Foundry: Insert Coin", text.c_str(), nullptr);
+                    tell(o, text);
+                    failed = true;
                 }
                 if (o.hash && !shared_px.empty())
                     std::printf("%s: %ld frames, last screen hash %016" PRIx64 "\n", g.romset.c_str(), frames.load(),
@@ -488,15 +596,17 @@ bool play(SDL_Renderer *r, const Game &g, const Options &o, Controls &ctl) {
         if (owed >= 1) gl.release();
         while (owed >= 1) {
             owed -= 1;
-            const afcore_input in = ctl.sample(r);
+            afcore_input in = ctl.sample(r);
+            if (o.report) o.report->take(in);
             g.api->run_frame(core, &in);
             if (const char *why = g.api->error(core)) {
                 const std::string text = g.title + " stopped: its core can't run this yet.\n" + why;
-                SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Arcade Foundry: Insert Coin", text.c_str(), nullptr);
+                tell(o, text);
                 running = false;
+                failed = true;
                 break;
             }
-            audio.push(g.api, core);
+            audio.push(g.api, core, o.report);
             ran = true;
             // A game without a picture takes one after half a minute (not in tests).
             if (++played == long(hz * picture_after) && o.frames == 0 && !has_picture) keep_screen(false);
@@ -537,11 +647,13 @@ bool play(SDL_Renderer *r, const Game &g, const Options &o, Controls &ctl) {
             }
             SDL_UpdateTexture(pixel_tex, nullptr, px, w * 4);
             tex = pixel_tex;
+            if (o.report && o.report->on_screen) o.report->on_screen(px, w, h);
             if (!running && o.hash)
                 std::printf("%s: %ld frames, last screen hash %016" PRIx64 "\n", g.romset.c_str(), frames.load(), fnv(px, size_t(w) * h));
         }
         int id = 0, count = 0;
         const int link = o.link_port > 0 && !threaded ? g.api->link_state(core, &id, &count) : AFCORE_LINK_OFF;
+        if (o.report && o.link_port > 0 && !threaded) o.report->link = link, o.report->link_id = id, o.report->link_count = count;
         if (link != last_link && o.link_port > 0 && !threaded) {
             static const char *names[] = {"off (set it in the game's test mode)", "waiting", "up", "lost"};
             if (link == AFCORE_LINK_UP) std::printf("insert-coin: link up, cabinet %d of %d\n", id, count);
@@ -569,10 +681,21 @@ bool play(SDL_Renderer *r, const Game &g, const Options &o, Controls &ctl) {
         }
         SDL_RenderPresent(r);
         const long now_played = played;
+        if (o.report) o.report->frames = now_played;
         count_speed(now_played - counted);
         counted = now_played;
     }
     end_worker();
+    // Resume where I left off: the game as it was left, for its page's Resume.
+    if (states && o.resume && !failed && played > 0) {
+        int w = 0, h = 0;
+        gl.release();
+        const uint32_t *px = g.api->screen(core, &w, &h);
+        const std::string why = save_slot(o, g, core, 0, px, w, h);
+        gl.take();
+        if (!why.empty()) std::fprintf(stderr, "insert-coin: the Resume slot wasn't saved: %s\n", why.c_str());
+    }
+    if (slot_picture) SDL_DestroyTexture(slot_picture);
     SDL_SetWindowTitle(win, "Arcade Foundry: Insert Coin");
     if (o.speed && played > 0) {
         const double span = (SDL_GetPerformanceCounter() - run_start) / freq;

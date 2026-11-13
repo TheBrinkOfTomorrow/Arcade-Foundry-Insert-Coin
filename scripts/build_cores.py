@@ -4,7 +4,7 @@
   build_cores.py --roms DIR [--sets SET,SET...] [--boards BOARD,BOARD...]
                  [--platforms macosx,iphoneos,iphonesimulator,appletvos,appletvsimulator | linux,linux-arm64]
                  [--model3 DIR] [--lindbergh DIR] [--lindbergh-renderer metal|gl] [--classic2d DIR] [--chihiro DIR]
-                 [--jobs N] [--force] [--status]
+                 [--jobs N] [--force] [--no-ccache] [--status]
 
 --boards builds every set of those boards: a board (model2b, xboard) or a
 library platform (model2 is Model 2, 2A, 2B and 2C; classic2d is every 2D
@@ -13,11 +13,16 @@ takes; --sets list lists every set by board, oldest board first, each
 board's games by year. Neither needs --roms.
 
 A core that is already built from the same ROM set, the same recompiler
-commit and the same version of this script is skipped (a stamp file next to
+commit, the same core interface version (the app's Common afcore.h) and the
+same version of this script is skipped (a stamp file next to
 it in build/cores/<platform>/ records what it was built from); --force
 rebuilds anyway. --status lists each core as up to date, out of date or
 missing without building anything. With uncommitted changes in the
 recompiler, nothing is skipped.
+
+With ccache installed, every compile goes through it (--no-ccache turns
+that off), so cores of the same board, and a core rebuilt with unchanged
+generated code, reuse earlier object files.
 
 DIR may keep the sets in a folder per board, one level down
 (DIR/Model2/srallyc.zip; work folders such as working/, temp/ and
@@ -259,11 +264,15 @@ def recompiler_state(src=RECOMP):
 
 
 def wanted_stamp(rom, commit, plat):
-    """What a core built now would be built from: ROM set, recompiler, this script, platform."""
+    """What a core built now would be built from: ROM set, recompiler, this
+    script, platform, and the app's core interface (Common's afcore.h), so a
+    new interface version rebuilds every core even when its repo's commit
+    hasn't moved."""
     if commit is None:
         return None
     return "\n".join([f"rom {file_sha1(rom)}", f"recompiler {commit}",
-                      f"script {file_sha1(os.path.abspath(__file__))}", f"platform {plat}"]) + "\n"
+                      f"script {file_sha1(os.path.abspath(__file__))}", f"platform {plat}",
+                      f"interface {interface_version(os.path.join(COMMON, 'include', 'afcore.h'))}"]) + "\n"
 
 
 def up_to_date(s, plat, stamp):
@@ -325,8 +334,11 @@ def build_model3(src, s, rom, plat, jobs, env):
     if plat in CROSS:
         # iOS and tvOS: Metal only, no SDL or OpenGL; zlib from the SDK. Built
         # with Xcode's generator, which puts the framework in Release-<sdk>/.
+        # The sysroot names the SDK at configure time too: without it
+        # find_package(ZLIB) caches the device SDK's libz.tbd, and a simulator
+        # build then fails to link ("built for 'iOS'", #419).
         system, sdk, target = CROSS[plat]
-        run(["cmake", "-S", src, "-B", build, "-G", "Xcode", f"-DCMAKE_SYSTEM_NAME={system}",
+        run(["cmake", "-S", src, "-B", build, "-G", "Xcode", f"-DCMAKE_SYSTEM_NAME={system}", f"-DCMAKE_OSX_SYSROOT={sdk}",
              f"-DCMAKE_OSX_DEPLOYMENT_TARGET={target}", "-DCMAKE_OSX_ARCHITECTURES=arm64",
              f"-DM3CORE_ROMSET={s}", "-DM3CORE_FRAMEWORK=ON"], env=env)
         run(["cmake", "--build", build, "--target", f"afcore_{s}", "--config", "Release", "--",
@@ -520,7 +532,8 @@ def drop_foreign_cache(build, source):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--roms", help="folder with your MAME ROM sets (or its board folders)")
+    ap.add_argument("--roms", default=os.environ.get("AF_ROMS") or None,
+                    help="folder with your MAME ROM sets (or its board folders); default: $AF_ROMS")
     ap.add_argument("--sets", help="comma-separated (default: all, or --boards's); list: list every set by board")
     ap.add_argument("--boards", help="comma-separated boards or platforms (model2, model3, xboard, ...): "
                     "build all their sets; list: list the names")
@@ -539,6 +552,7 @@ def main():
                          "desktop OpenGL on macOS; kept for one release)")
     ap.add_argument("--jobs", "-j", type=int, default=os.cpu_count() or 1)
     ap.add_argument("--force", action="store_true", help="rebuild cores that are up to date")
+    ap.add_argument("--no-ccache", action="store_true", help="do not use ccache even when it is installed")
     ap.add_argument("--status", action="store_true", help="list which cores are up to date, build nothing")
     args = ap.parse_args()
     if args.boards == "list" or args.sets == "list":
@@ -548,7 +562,7 @@ def main():
             list_sets()
         return
     if not args.roms:
-        ap.error("--roms is required")
+        ap.error("--roms is required (or set AF_ROMS to your ROM folder)")
     wanted = [x for x in (args.sets or "").split(",") if x]
     for b in [x for x in (args.boards or "").split(",") if x]:
         sets = board_sets(b)
@@ -591,6 +605,15 @@ def main():
     if "linux-arm64" in cross and os.uname().machine in ("aarch64", "arm64"):
         sys.exit("build_cores: this machine is arm64 already: build for linux")
     env = dict(os.environ)
+    # ccache when it is installed (brew install ccache, apt install ccache):
+    # the sets of one board share most of their sources, and a core rebuilt
+    # after a recompiler commit that left its generated code alone recompiles
+    # nothing. CMake reads the launcher when it first configures a build
+    # folder, so folders made before this keep building without it.
+    if not args.no_ccache and shutil.which("ccache") and not env.get("CMAKE_CXX_COMPILER_LAUNCHER"):
+        env.update(CMAKE_C_COMPILER_LAUNCHER="ccache", CMAKE_CXX_COMPILER_LAUNCHER="ccache")
+        env.setdefault("CCACHE_BASEDIR", ROOT)  # hits across build folders
+        env.setdefault("CCACHE_NOHASHDIR", "1")
     if host == "macosx":
         env.setdefault("MACOSX_DEPLOYMENT_TARGET", "13.0")  # the app's
 
@@ -758,9 +781,9 @@ def main():
         print(f"build_cores: no ROM set in {args.roms} for {', '.join(missing)}")
     if args.status:
         return
-    print(f"build_cores: built {', '.join(built) or 'nothing'} for {', '.join(targets)} into build/cores/")
+    print(f"build_cores: built {', '.join(built) or 'nothing'} for {', '.join(targets)} into {os.path.join(ROOT, 'build', 'cores')}/")
     if skipped:
-        print(f"build_cores: already up to date: {', '.join(skipped)} (--force rebuilds)")
+        print(f"build_cores: already up to date in {os.path.join(ROOT, 'build', 'cores')}/: {', '.join(skipped)} (--force rebuilds)")
     if not built and not skipped:
         sys.exit(1)
 

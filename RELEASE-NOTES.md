@@ -2,6 +2,64 @@
 
 Newest first. Each release is also on the repository's Releases page.
 
+## 1.3.0 (2026-11-12)
+
+**Arcade Foundry: Insert Coin 1.3.0**
+
+1.3.0 adds the Sega Chihiro board with three games, Virtua Formula, save
+states for the Model 1, 2 and 3 games, and link play for more Model 2 and
+Model 3 racers. The library now has 87 games, 93 ROM sets.
+
+- **Sega Chihiro**: Virtua Cop 3, The House of the Dead III and Crazy Taxi
+  High Roller, on macOS, Linux and iPad (iPhone untested). Each game's
+  program is translated ahead of time from your own copy and runs on the
+  Chihiro core's own Xbox kernel; you supply the game folders (as `<set>.tar`,
+  which `scripts/pack_games.py` packs from MAME's .7z sets or from decrypted
+  GD-ROM images) and MAME's `chihiro.zip`. Crazy Taxi needs a dump with
+  intact movies (the Rev B image).
+- **Save states for Model 1, Model 2 and Model 3**, on Linux and Apple
+  devices: Save state and Load state in the pause menu, three slots per
+  game, each with its screen, date and play time. **Resume where I left
+  off** (Settings, off at first) keeps the game as you left it and puts
+  Resume above Play on its page; on Apple devices the Resume slot syncs
+  through iCloud. Not while linked, and not for Classic 2D, Lindbergh or
+  Chihiro games yet.
+- **Link play for Model 3**: Scud Race, Daytona USA 2 (up to 16 cabinets),
+  Sega Rally 2, Le Mans 24, Harley-Davidson & L.A. Riders and Dirt Devils
+  link like the Model 1 and Model 2 racers. A cabinet that
+  stops answering drops the link after 3 seconds instead of freezing the
+  others. See [LINK_PLAY.md](LINK_PLAY.md).
+- **Le Mans 24** starts in Export (English) on a new save instead of Japan.
+  The hidden country menu is described in [LINK_PLAY.md](LINK_PLAY.md).
+- **More Model 2 link play**: Sega Touring Car Championship, Over Rev and
+  Cyber Troopers Virtual-On (versus) link like Daytona USA. See
+  [LINK_PLAY.md](LINK_PLAY.md).
+- **Virtua Formula** (1993), Virtua Racing's attraction version for up to
+  eight linked cockpits, with link play. It plays from the same `vr.7z` (or
+  `.zip`) as Virtua Racing.
+- **Game categories** in the library: racing, shooter, fighting and other.
+- **Video renders** (`--video`) keep the game's own sound in step for the
+  Lindbergh and Chihiro games.
+- macOS: Esc opens the pause menu; Show speed works in full screen.
+- Let's Go Jungle!: X (the action button) also works as Start.
+- The Apple app's engine moved into its own repository,
+  [Arcade-Foundry-IC-Kit](https://github.com/TheBrinkOfTomorrow/Arcade-Foundry-IC-Kit)
+  (the `kit/` submodule).
+
+### Known issues
+
+- Crazy Taxi High Roller's test mode (a separate program on the disc) isn't
+  available yet.
+- The very first start of a Lindbergh game on Metal builds its shaders and
+  runs slowly, without sound, until they are built.
+- The Logitech G29 works after calibrating but hasn't been tested on a real
+  G29; that's planned for 1.4.0. The Driving Force GT is tested on Linux and
+  the Mac.
+
+### Included cores (all at v1.3.0)
+
+[Classic 2D](https://github.com/TheBrinkOfTomorrow/Arcade-Foundry-Cores-Classic2D/releases/tag/v1.3.0), [Model 1 & 2](https://github.com/TheBrinkOfTomorrow/Arcade-Foundry-Cores-Model12/releases/tag/v1.3.0), [Model 3](https://github.com/TheBrinkOfTomorrow/Arcade-Foundry-Cores-Model3/releases/tag/v1.3.0), [Lindbergh](https://github.com/TheBrinkOfTomorrow/Arcade-Foundry-Cores-Lindbergh/releases/tag/v1.3.0) and [Chihiro](https://github.com/TheBrinkOfTomorrow/Arcade-Foundry-Cores-Chihiro/releases/tag/v1.3.0), with the shared [Cores-Common](https://github.com/TheBrinkOfTomorrow/Arcade-Foundry-Cores-Common/releases/tag/v1.3.0) and the Apple apps' [IC-Kit](https://github.com/TheBrinkOfTomorrow/Arcade-Foundry-IC-Kit/releases/tag/v1.3.0). They come in as submodules, so clone with `git clone --recursive`.
+
 ## 1.2.0 (2026-11-06)
 
 **Arcade Foundry: Insert Coin 1.2.0**

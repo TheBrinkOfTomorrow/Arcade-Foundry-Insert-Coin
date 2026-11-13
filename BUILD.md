@@ -12,7 +12,11 @@ from your ROMs are derived from them, so don't share them.
 You need Xcode, CMake, Ninja, Python 3 and
 [XcodeGen](https://github.com/yonaskolb/XcodeGen):
 
-    brew install cmake ninja xcodegen python gh sdl2 sdl3 sevenzip
+    brew install cmake ninja xcodegen python gh sdl2 sdl3 sevenzip ccache
+
+ccache is optional but recommended: when it is installed, build_cores.py
+runs every core compile through it, so rebuilding a core that hasn't
+changed takes seconds (`--no-ccache` turns it off).
 
 Then:
 
@@ -21,6 +25,7 @@ Then:
     git pull && git submodule update --init --recursive
     cores/arcade-foundry-cores-common/tools/afic-venv/setup.sh    
     python3 scripts/build_cores.py --roms ~/path/to/roms   # each <set>.zip/.7z found there
+    export AF_ROMS=~/path/to/roms                          # then --roms can be left out
     cd apple && xcodegen && open InsertCoin.xcodeproj
 
 `build_cores.py` recompiles each game it finds a ROM set for (the recompiler
@@ -61,7 +66,7 @@ folder per board, one level down and flat (no folders inside):
       HangOn/     hangon.zip  sharrier.zip  enduror.zip
       XBoard/     aburner131.zip  aburner2.zip  thndrbld.zip  rachero.zip  smgp.zip  loffire.zip  gprider.zip
       YBoard/     gforce2.zip  pdrift.zip  gloc.zip  strkfgtr.zip  rchase.zip
-      Model1/     vr.7z  swa.7z  vf.7z  wingwar.7z  model1io2.zip
+      Model1/     vr.7z (vr and vformula)  swa.7z  vf.7z  wingwar.7z  model1io2.zip
       Model2/     daytona.zip  srallyc.zip  hotd.7z ...
       Model3/     scud.zip  vf3.zip  bassdx.zip ...
       Lindbergh/  hotd4a.tar  outr2sdx.tar ...
@@ -193,6 +198,17 @@ all take. A game dumped as a `.7z` of its disc files (`Chihiro/Virtua Cop
 which finds each dump by the XBE inside it, unpacks it with `7zz`, `7z`,
 `7za` or `bsdtar` (`brew install sevenzip`; on Linux the `7zip` or `p7zip-full` package) and
 writes `vcop3.tar`, `hotd3.tar` beside it. The `.7z` is left as it is.
+A decrypted GD-ROM image (a `.bin` that starts with `FATX`, such as
+`Crazy Taxi High Roller (Rev B) (GDX-0002B).bin`) is read the same way,
+with no other tool. It wins over a `.7z` of the same game when both hold
+the same XBE: the Crazy Taxi `.7z` dumps going round hold filler where its
+attract movies should be (they play as black), and the Rev B image has
+them. An image with another XBE (Virtua Cop 3's GDX-0003B is a later
+revision) loses to the `.7z`, as the cores are made and tested from the
+dumps; the packer says so. Likewise an image never replaces an existing
+`<set>.tar` that holds another XBE. Add `--force --sets crtaxihr` to replace a
+`crtaxihr.tar` packed earlier from a `.7z`. `scripts/fatx.py list IMAGE`
+shows what an image holds.
 
 The baseboard's EEPROMs (its operator settings and board ID) come from
 MAME's Chihiro BIOS set. Leave `chihiro.zip` zipped, anywhere in the ROM
@@ -259,7 +275,10 @@ You need CMake, Ninja, a C++20 compiler and Python 3, plus SDL's usual
 development packages for X11/Wayland and audio. Model 3 cores also need
 `libsdl2-dev libsdl2-net-dev libglu1-mesa-dev libegl-dev`. Game art
 downloads need libcurl (`libcurl4-openssl-dev`, or `libcurl-devel` on
-Fedora); without it CMake warns and the app builds without them.
+Fedora); without it CMake warns and the app builds without them. Save
+states need zlib (`zlib1g-dev`, or `zlib-devel` on Fedora).
+Install `ccache` too (optional, recommended): build_cores.py uses it when
+it is installed, which makes core rebuilds much faster.
 
 1. The cores, from your ROM sets:
 
@@ -347,7 +366,8 @@ every set it builds (title, year, board, version, core version, controls),
 and this repo's lists the sets the app shows, in the library's order, with
 the hint its detail line gives. `scripts/gen_games.py` (Python 3.11 or
 later) writes the rest from them: the Apple catalog
-(`apple/InsertCoin/Library/GameList.swift`), the Linux app's table
+(`kit/Sources/Library/GameList.swift`, in the kit submodule: commit it
+there, then move the submodule here), the Linux app's table
 (`linux/game_list.h`), `build_cores.py`'s lists (`scripts/game_sets.py`)
 and the tables in [GAMES.md](GAMES.md). For a new game:
 

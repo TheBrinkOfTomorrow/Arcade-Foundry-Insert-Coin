@@ -18,10 +18,12 @@ nothing taken from ROMs.
 |---|---|---|
 | [WHEEL-AND-PEDALS.md](WHEEL-AND-PEDALS.md) | Steering wheels, pedals and shifters (issue #318) | Linux done; self-centring, dead zone, G29, Apple platforms open |
 | [APP-ARCHITECTURE.md](APP-ARCHITECTURE.md) | The app as a whole: the game list, building and loading cores, sessions, saves and cabinets, link play, settings, the Apple and Linux front ends, releases | Current as of 1.3.0 development |
+| [Game Director](https://github.com/TheBrinkOfTomorrow/Arcade-Foundry-Game-Director/blob/main/docs/design/GAME-DIRECTOR.md) | Moved to Arcade-Foundry-Game-Director-devel (7 Nov 2026): the multiplayer hub, now Game Director, and its player, Game Cabinet. Part 2 is [GAME-DIRECTOR-PART2.md](https://github.com/TheBrinkOfTomorrow/Arcade-Foundry-Game-Director/blob/main/docs/design/GAME-DIRECTOR-PART2.md) there | Its own repo |
 | ROM server and ROM sync | The ROM server URL, iCloud Drive, downloads and checks | To write |
 | Light guns | Mouse, touch, gamepad aim and real light guns | To write |
+| [SAVE-STATES.md](SAVE-STATES.md) | Save states and resume (1.4.0): the pause menu's slots, the Resume slot, which boards can save (not the x86 ones, and why), afcore 5.4.0, storage, link play and replays, testing | Plan, not built |
 | [CONTROL-SCHEME.md](CONTROL-SCHEME.md) | How the app and games are controlled on each platform: the default controller layout, each kind of game, keyboard and mouse, touch and the on-screen controller on iPhone and iPad, Apple TV, button maps, two players, operator mode; touch settings (#359) | Current; open items listed |
-| Other controllers | Controllers beyond a gamepad, keyboard, mouse and touch, and how each maps to the games: twin sticks for Virtual-On (the Sega Saturn twin sticks), fight sticks (8BitDo Arcade Stick over Bluetooth, 2.4 GHz wireless and wired), fishing rods and other cabinet-style controllers; each to try on Linux, macOS, iPhone, iPad and Apple TV | To write |
+| [OTHER-CONTROLLERS.md](OTHER-CONTROLLERS.md) | Controllers beyond a gamepad, keyboard, mouse and touch, and how each maps to the games: twin sticks for Virtual-On (the Sega Saturn twin sticks), fight sticks (8BitDo Arcade Stick over Bluetooth, 2.4 GHz wireless and wired), fishing rods, the GAMR Play Pad floor mat (#435) and other cabinet-style controllers; each to try on Linux, macOS, iPhone, iPad and Apple TV | Started: GAMR Play Pad (paper only); the rest to write |
 
 ## Core designs
 

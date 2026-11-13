@@ -116,6 +116,7 @@ struct Controls {
     bool analog_gun = false; // (Game::analog_gun)
     bool gun = false;        // a light gun game (is_gun_game): the gamepads aim
     bool gun_button = false; // the gun's button, BUTTON3: HotD4's grenade, Line of Fire's missile (GameInfo.gunButton)
+    bool gun_start = false;  // West (G, middle-click) presses its player's Start: Let's Go Jungle!'s action button (gun_start_game)
     bool crosshair = false;  // and draw_crosshairs shows where (shows_crosshair, and the game's setting)
     bool second_joined = false; // player 2 pressed Start on the second gamepad: its crosshair shows
     // Where the guns aim, 0..1 across and down the picture: player 1's from
@@ -215,6 +216,10 @@ void buttons_event(const SDL_Event &e, ButtonMap &map, const fs::path &file, int
 
 // The light gun and turret games (GameInfo.aimsGun in the Apple app's Catalog.swift).
 bool is_gun_game(const Game &g);
+
+// Let's Go Jungle!: the cabinet's big Start buttons are its action buttons
+// during play, so West (G, middle-click) presses Start too (GameInfo.gunStart, #404).
+bool gun_start_game(const Game &g);
 
 // The gun games that get a crosshair: not Gunblade NY, Behind Enemy Lines
 // or Rail Chase 2, whose turrets draw their own sight (as on the Apple devices).

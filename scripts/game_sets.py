@@ -4,17 +4,17 @@
 SETS = ['daytona93', 'daytona', 'srallyc', 'manxttc', 'motoraid', 'doab', 'lastbrnx', 'schamp', 'dynabb97',
         'waverunr', 'bel', 'topskatr', 'skisuprg', 'segawski', 'desert', 'skytargt', 'dynamcop', 'vcop2',
         'vcop', 'vf2', 'indy500', 'fvipers', 'sgt24h', 'overrevb', 'stcc', 'vstriker', 'zerogun', 'pltkids',
-        'rchase2', 'gunblade', 'hotdo', 'von', 'vr', 'swa', 'vf', 'wingwar', 'vf3', 'scud', 'scudplus',
-        'daytona2', 'dayto2pe', 'srally2', 'lemans24', 'dirtdvls', 'harley', 'ecau', 'fvipers2', 'von2',
-        'spikeout', 'spikeofe', 'vs299a', 'swtrilgy', 'lostwsga', 'lamachin', 'oceanhuna', 'bassdx',
+        'rchase2', 'gunblade', 'hotdo', 'von', 'vr', 'vformula', 'swa', 'vf', 'wingwar', 'vf3', 'scud',
+        'scudplus', 'daytona2', 'dayto2pe', 'srally2', 'lemans24', 'dirtdvls', 'harley', 'ecau', 'fvipers2',
+        'von2', 'spikeout', 'spikeofe', 'vs299a', 'swtrilgy', 'lostwsga', 'lamachin', 'oceanhuna', 'bassdx',
         'getbass', 'getbassur', 'getbassdx', 'magtruck', 'hotd4a', 'letsgoju', 'segartv', 'outr2sdx',
         'outrun', 'shangon', 'aburner131', 'aburner2', 'rachero', 'loffire', 'gprider', 'smgp', 'thndrbld',
         'toutrun', 'orunners', 'hangon', 'sharrier', 'enduror', 'radr', 'radm', 'f1en', 'jpark', 'sonic',
         'ga2', 'gforce2', 'pdrift', 'gloc', 'strkfgtr', 'rchase', 'hotd3', 'vcop3', 'crtaxihr']
 # Sets left out of this release (games.toml's hidden): built only when named
-HIDDEN = {'hotd3', 'vcop3', 'crtaxihr'}
+HIDDEN = set()
 # Model 1 sets: the recompiler's Model 1 build (CMake M1_CORE, target m1core)
-MODEL1 = {'vr', 'swa', 'vf', 'wingwar'}
+MODEL1 = {'vr', 'vformula', 'swa', 'vf', 'wingwar'}
 # Model 3 sets: Arcade-Foundry-Cores-Model3 (CMake M3CORE_ROMSET)
 MODEL3 = {'vf3', 'scud', 'scudplus', 'daytona2', 'dayto2pe', 'srally2', 'lemans24', 'dirtdvls', 'harley',
           'ecau', 'fvipers2', 'von2', 'spikeout', 'spikeofe', 'vs299a', 'swtrilgy', 'lostwsga', 'lamachin',
@@ -72,6 +72,7 @@ GAMES = {
     'hotdo': (1997, 'The House of the Dead', 'model2c'),
     'von': (1995, 'Cyber Troopers Virtual-On', 'model2b'),
     'vr': (1992, 'Virtua Racing', 'model1'),
+    'vformula': (1993, 'Virtua Formula', 'model1'),
     'swa': (1993, 'Star Wars Arcade', 'model1'),
     'vf': (1993, 'Virtua Fighter', 'model1'),
     'wingwar': (1994, 'Wing War', 'model1'),
@@ -151,4 +152,4 @@ BOARDS = {
 }
 # The other names a set's files may have: MAME's parents and older dumps that
 # hold it, and the app's earlier names for it
-OTHER_NAMES = {'doab': ('doa',), 'hotdo': ('hotd',), 'hotd4a': ('hotd4',), 'letsgoju': ('lgj',), 'outr2sdx': ('or2sp',)}
+OTHER_NAMES = {'doab': ('doa',), 'hotdo': ('hotd',), 'vformula': ('vr',), 'hotd4a': ('hotd4',), 'letsgoju': ('lgj',), 'outr2sdx': ('or2sp',)}

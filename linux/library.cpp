@@ -1,5 +1,7 @@
 #include "library.h"
 
+#include "runner.h"
+
 #include "credits.h"
 #include "history.h"
 
@@ -119,6 +121,7 @@ void AppSettings::load(const fs::path &file) {
         if (key == "show_speed") show_speed = v != "0";
         else if (key == "game_thread") game_thread = v != "0";
         else if (key == "download_art") download_art = v != "0";
+        else if (key == "resume") resume = v == "1";
         else look.parse(l);
     }
     std::fclose(f);
@@ -130,8 +133,8 @@ void AppSettings::save(const fs::path &file) const {
     if (std::FILE *f = std::fopen(file.c_str(), "w")) {
         std::string screen = look.str();
         std::replace(screen.begin(), screen.end(), ',', '\n');
-        std::fprintf(f, "%s\nshow_speed=%d\ngame_thread=%d\ndownload_art=%d\n", screen.c_str(), show_speed ? 1 : 0, game_thread ? 1 : 0,
-                     download_art ? 1 : 0);
+        std::fprintf(f, "%s\nshow_speed=%d\ngame_thread=%d\nresume=%d\ndownload_art=%d\n", screen.c_str(), show_speed ? 1 : 0,
+                     game_thread ? 1 : 0, resume ? 1 : 0, download_art ? 1 : 0);
         std::fclose(f);
     }
 }
@@ -149,6 +152,7 @@ void change_setting(AppSettings &s, SettingRow row, int step, SDL_Window *win, c
     case SettingRow::fullscreen: set_fullscreen(win, !g_fullscreen, data); break;
     case SettingRow::show_speed: s.show_speed = !s.show_speed; break;
     case SettingRow::game_thread: s.game_thread = !s.game_thread; break;
+    case SettingRow::resume: s.resume = !s.resume; break;
     case SettingRow::download_art: s.download_art = !s.download_art; break;
     case SettingRow::remove_art:
     case SettingRow::credits: break;
@@ -184,6 +188,7 @@ void draw_settings(SDL_Renderer *r, const AppSettings &s, int item, const std::s
         {nullptr, "Full screen (F11)", on(g_fullscreen)},
         {"SPEED", "Show speed (title bar; corner in full screen)", on(s.show_speed)},
         {nullptr, "Game on its own thread (Model 1, 2, Chihiro)", on(s.game_thread)},
+        {"GAMES", "Resume where I left off (Model 1, 2, 3)", on(s.resume)},
         {"GAME ART", "Download game art", Art::built() ? on(s.download_art) : "Not in this build"},
         {nullptr, "Remove downloaded art", art_note},
         {"ABOUT", "Credits", ">"},
@@ -331,7 +336,9 @@ fs::path link_roms(const fs::path &roms, const fs::path &dst) {
                 for (char &c : n) c = char(std::tolower((unsigned char)c));
                 const bool work = n == "working" || n == "temp" || n == "__macosx" || n.rfind("to-file", 0) == 0 || n[0] == '_';
                 if (work) continue;
-                if (fs::is_directory(p / "disk0", e) || holds_xbe(p)) found[name].push_back({depth, p});
+                const std::string program = pc_program(name); // a PC-based game's folder: its program in it
+                if (fs::is_directory(p / "disk0", e) || holds_xbe(p) || (!program.empty() && fs::is_regular_file(p / program, e)))
+                    found[name].push_back({depth, p});
                 else if (depth < 1 && !fs::is_symlink(p, e)) walk(p, depth + 1);
                 else if (depth == 1) { // a game's own folder: its one archive
                     std::vector<fs::path> inside;
@@ -417,9 +424,14 @@ std::vector<Game> find_games(const Options &o) {
         const std::string platform = kPlatforms[e.platform].key;
         g.folder = platform == "lindbergh" || platform == "chihiro";
         if (platform == "chihiro") g.xbe = chihiro_xbe(e.set);
+        if (platform == "pc") g.pc = true, g.program = pc_program(e.set);
         games.push_back(std::move(g));
     }
     for (Game &g : games) {
+        if (g.pc) { // no core library: its runner and its game folder
+            find_pc_game(g, o);
+            continue;
+        }
         g.api = load_core(o.cores, g.romset, &g.outdated);
         if (!g.xbe.empty()) { // a Chihiro game: the folder that holds its XBE
             std::error_code ec;
@@ -506,6 +518,11 @@ void sort_games(std::vector<ArcadeGame> &games, Sort sort, const std::map<std::s
 }
 
 std::string status(const Game &g, const Options &o) {
+    if (g.pc)
+        return g.runner.empty() ? "not in this build: scripts/build_cores.py with its game folder"
+               : g.rom.empty()  ? "no game folder: choose it in this version's settings (Game folder)" +
+                                     (g.program.empty() ? std::string() : ", the folder holding " + g.program)
+                                : g.romset + "  game folder " + g.rom.string();
     return g.outdated ? "core for interface " + version_string(g.outdated) + ": rebuild it with scripts/build_cores.py"
            : !g.api ? "not in this build: scripts/build_cores.py with its ROM set"
            : g.rom.empty() && !g.xbe.empty() ? "no game: put its folder (" + g.romset + "/, holding " + g.xbe + ") or " + g.romset + ".tar in " + o.roms.string()
@@ -612,6 +629,12 @@ std::vector<ControlLine> control_lines(const Game &g) {
         {"Gear up, down", "A, Z", "Right, left shoulder"},
         {"Views 1-4", "1-4", "South, East, West, North (A, B, X, Y)"},
     };
+    static const std::vector<ControlLine> taxi = { // Crazy Taxi High Roller: Drive and Reverse, JUMP on views 1 and 2
+        {"Steer", "Left, Right", "Left stick"},
+        {"Accelerate, brake", "Up, Down", "Right, left trigger"},
+        {"Drive, Reverse", "A, Z", "Right, left shoulder"},
+        {"Jump", "1 or 2", "South or East (A or B)"},
+    };
     static const std::vector<ControlLine> gun = {
         {"Aim", "Mouse", "Right or left stick"},
         {"Fire", "Click or Space", "Right trigger or South (A)"},
@@ -657,9 +680,17 @@ std::vector<ControlLine> control_lines(const Game &g) {
     };
     const bool fishes = g.controls == GameControls::Fishing;
     const bool fights = g.controls == GameControls::Fighting;
-    std::vector<ControlLine> lines = g.flight ? flight : g.twin ? twin : is_gun_game(g) ? gun : fishes ? fishing : fights ? fighting : driving;
-    if (g.gun_button) // before Player 2
+    std::vector<ControlLine> lines = g.flight ? flight : g.twin ? twin : is_gun_game(g) ? gun : fishes ? fishing : fights ? fighting : g.romset == "crtaxihr" ? taxi : driving;
+    if (g.romset == "hotd3") // the reload pumps the gun's grip
+        for (auto &l : lines)
+            if (std::string(l.control) == "Reload") l.control = "Reload (grip)";
+    if (g.romset == "vcop3") { // before Player 2: the gun's button changes weapon, North is the foot pedal
+        lines.insert(lines.end() - 1, {"Change weapon", "Middle-click or G", "West (X)"});
+        lines.insert(lines.end() - 1, {"Pedal", "F", "North (Y)"});
+    } else if (g.gun_button)
         lines.insert(lines.end() - 1, {g.romset == "loffire" ? "Missile" : "Grenade", "Middle-click or G", "West (X)"});
+    else if (gun_start_game(g))
+        lines.insert(lines.end() - 1, {"Action (Start)", "Return, middle-click or G", "Start or West (X)"});
     lines.insert(lines.end(), cabinet.begin(), cabinet.end());
     return lines;
 }
@@ -706,19 +737,25 @@ void draw_page(SDL_Renderer *r, GamePage &page, const Options &o, const Art &art
         const GamePage::Row row = all[size_t(i)];
         const Game &v = *page.game.versions[size_t(row.version)];
         const bool on = page.item == i;
+        if (row.option == -2) { // Resume, above Play
+            add(std::string(on ? "> " : "  ") + "Resume: " + v.detail + "   [Resume]", on ? chosen : white, i);
+            add("    Where you left off: " + read_slot(o, v, 0).describe(), grey, i);
+            continue;
+        }
         if (row.option < 0) {
-            std::string hint = v.playable() ? "   [Play]" : "";
+            std::string hint = v.playable() ? page.resumable[size_t(row.version)] ? "   [Play from the start]" : "   [Play]" : "";
             if (page.folds() && page.options(row.version)) hint += page.open == row.version ? "   [< settings]" : "   [settings >]";
             add(std::string(on ? "> " : "  ") + v.detail + hint, on ? chosen : v.playable() ? white : dim, i);
             add("    " + (v.playable() ? "" : v.romset + ": ") + status(v, o), grey, i);
             continue;
         }
         // the open version's options: the page holds the chosen version's, and the cursor is on one of them
-        const std::string text[kPageOptions + 2] = {std::string("Shape: ") + Look::name(page.look.shape),
+        const std::string text[kPageOptions + 3] = {std::string("Shape: ") + Look::name(page.look.shape),
                                                     std::string("Effect: ") + Look::name(page.look.effect),
                                                     std::string("Controller buttons: ") + (page.map.is_default() ? "default" : "changed"),
                                                     std::string("Crosshair (gamepad aim): ") + (page.crosshair ? "on" : "off"),
-                                                    std::string("Region (the game's language follows): ") + region_name(page.region)};
+                                                    std::string("Region (the game's language follows): ") + region_name(page.region),
+                                                    std::string("Game folder: ") + (v.rom.empty() ? "not chosen" : v.rom.string())};
         add(std::string(on ? "    > " : "      ") + text[page.option_kind(row.option)], on ? chosen : white, i);
     }
     add("", grey);

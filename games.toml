@@ -124,6 +124,9 @@ set = "von"
 set = "vr"
 
 [[game]]
+set = "vformula"
+
+[[game]]
 set = "swa"
 hint = "the left stick flies"
 
@@ -234,7 +237,7 @@ linux_hint = "middle-click, G or {W} throws a grenade"
 
 [[game]]
 set = "letsgoju"
-hint = "hold to fire"
+hint = "hold to fire; Start or {W} is the action button"
 doc_title = "Let's Go Jungle! Lost on the Island of Spice"
 
 [[game]]
@@ -349,15 +352,13 @@ hint = "two guns on the rail cars; the game draws each gun's sight"
 
 [[game]]
 set = "hotd3"
-hidden = true
+hint = "{E} reloads (the gun's grip, pumped)"
 
 [[game]]
 set = "vcop3"
-hidden = true
-hint = "middle-click, G, {W} or three fingers changes weapon"
-linux_hint = "middle-click, G or {W} changes weapon"
+hint = "{E} reloads; {W}, middle-click, G or three fingers changes weapon; {N} or F is the pedal"
+linux_hint = "{E} reloads; {W}, middle-click or G changes weapon; {N} or F is the pedal"
 
 [[game]]
 set = "crtaxihr"
-hidden = true
-hint = "steer with the left stick; the right trigger accelerates, the left brakes; the right shoulder is Drive, the left Reverse"
+hint = "steer with the left stick; the right trigger accelerates, the left brakes; the right shoulder is Drive, the left Reverse; {S} or {E} jumps"

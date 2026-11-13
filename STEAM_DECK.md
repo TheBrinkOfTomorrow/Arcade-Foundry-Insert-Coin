@@ -82,7 +82,7 @@ The first time, this takes a few minutes to set up. Your prompt changes to
 Inside the box, install the build tools (one long command):
 
     sudo apt update && sudo apt install -y \
-        build-essential git cmake ninja-build pkg-config python3 python3-venv \
+        build-essential git cmake ninja-build ccache pkg-config python3 python3-venv \
         libasound2-dev libpulse-dev libpipewire-0.3-dev \
         libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev \
         libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev libdecor-0-dev \
@@ -136,7 +136,7 @@ its board's folder, one file per set:
       HangOn/      hangon.zip  sharrier.zip  enduror.zip
       XBoard/      aburner131.zip  aburner2.zip  thndrbld.zip  rachero.zip  smgp.zip  loffire.zip  gprider.zip
       YBoard/      gforce2.zip  pdrift.zip  gloc.zip  strkfgtr.zip  rchase.zip
-      Model1/      vr.zip  swa.zip  vf.zip  wingwar.zip  model1io2.zip
+      Model1/      vr.zip (vr and vformula)  swa.zip  vf.zip  wingwar.zip  model1io2.zip
       Model2/      daytona.zip  srallyc.zip  vcop.zip  hotdo.zip ...
       Model3/      vf3.zip  scud.zip  daytona2.zip  srally2.zip ...
       Lindbergh/   hotd4a.tar  outr2sdx.tar

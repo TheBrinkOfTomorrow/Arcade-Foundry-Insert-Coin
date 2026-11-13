@@ -8,7 +8,7 @@
 //                [--shape original|stretch|integer] [--effect none|scanlines|crt]
 //                [--sharp] [--size PERCENT] [--move X,Y]
 //                [--link-port PORT --link-next HOST:PORT [--link-sync]]
-//                [--play ROMSET] [--frames N --screenshot-hash] [--speed] [--no-game-thread] [--version] [--credits]
+//                [--play ROMSET [--resume] [--game-folder DIR]] [--frames N --screenshot-hash] [--speed] [--no-game-thread] [--version] [--credits]
 //
 // ROM sets: DIR/<romset>.zip or .7z (default ~/.local/share/arcade-foundry/roms),
 // at its top or in a folder per board (DIR/Model2/srallyc.zip);
@@ -25,6 +25,7 @@
 #include "input.h"
 #include "library.h"
 #include "session.h"
+#include "runner.h"
 
 #include <SDL3/SDL_main.h>
 
@@ -53,6 +54,7 @@ int main(int argc, char **argv) {
     AppSettings settings;
     settings.load(settings_file);
     settings.apply(o);
+    bool resume_play = false; // --resume: --play's game from its Resume slot
     for (int i = 1; i < argc; ++i) {
         const std::string a = argv[i];
         const bool more = i + 1 < argc;
@@ -63,6 +65,8 @@ int main(int argc, char **argv) {
         else if (a == "--link-next" && more) o.link_next = argv[++i];
         else if (a == "--link-sync") o.link_sync = true;
         else if (a == "--play" && more) o.play = argv[++i];
+        else if (a == "--resume") resume_play = true;
+        else if (a == "--game-folder" && more) o.game_folder = argv[++i];
         else if (a == "--frames" && more) o.frames = std::atol(argv[++i]);
         else if (a == "--screenshot-hash") o.hash = true;
         else if (a == "--speed") o.speed = true;
@@ -88,7 +92,7 @@ int main(int argc, char **argv) {
                         AFCORE_API_PATCH);
             return 0;
         } else {
-            std::fprintf(stderr, "usage: insert-coin [--roms DIR] [--cores DIR] [--fullscreen] [--shape original|stretch|integer] [--effect none|scanlines|crt] [--sharp] [--size PERCENT] [--move X,Y] [--link-port PORT --link-next HOST:PORT [--link-sync]] [--play ROMSET] [--frames N --screenshot-hash] [--speed] [--no-game-thread] [--version] [--credits]\n");
+            std::fprintf(stderr, "usage: insert-coin [--roms DIR] [--cores DIR] [--fullscreen] [--shape original|stretch|integer] [--effect none|scanlines|crt] [--sharp] [--size PERCENT] [--move X,Y] [--link-port PORT --link-next HOST:PORT [--link-sync]] [--play ROMSET [--resume]] [--frames N --screenshot-hash] [--speed] [--no-game-thread] [--version] [--credits]\n");
             return 2;
         }
     }
@@ -119,12 +123,12 @@ int main(int argc, char **argv) {
 
     if (!o.play.empty()) { // straight into one game
         auto it = std::find_if(games.begin(), games.end(), [&](const Game &g) { return g.romset == o.play; });
-        if (it == games.end() || !it->api || it->rom.empty()) {
+        if (it == games.end() || !it->playable()) {
             std::fprintf(stderr, "insert-coin: %s: no core or no ROM set (cores %s, ROMs %s)\n", o.play.c_str(),
                          o.cores.c_str(), o.roms.c_str());
             return 1;
         }
-        play(r, *it, o, ctl);
+        play(r, *it, o, ctl, resume_play);
     } else {
         size_t sel = 0;
         Images images;
@@ -185,6 +189,7 @@ int main(int argc, char **argv) {
             if (settings.look.str() != before.str()) o.look = settings.look;
             if (settings.show_speed != speed) o.show_speed = settings.show_speed;
             if (settings.game_thread != thread) o.game_thread = settings.game_thread;
+            o.resume = settings.resume;
         };
         std::optional<GamePage> page; // a game's page is open
         bool l2_held = false, r2_held = false; // the triggers are axes: a press is one going past three quarters
@@ -253,11 +258,11 @@ int main(int argc, char **argv) {
                         page->version = page->row().version;
                         page->reload(o);
                     }
-                    const int option = page->row().option < 0 ? -1 : page->option_kind(page->row().option);
+                    const int option = page->row().option < 0 ? page->row().option : page->option_kind(page->row().option);
                     if (is(SDL_SCANCODE_RETURN, SDL_GAMEPAD_BUTTON_SOUTH) && !(key && e.key.repeat)) {
-                        if (option < 0 && page->chosen().playable()) {
+                        if (option < 0 && page->chosen().playable()) { // -2 Resume, -1 Play
                             art.hold(true); // no downloads while a game plays
-                            running = play(r, page->chosen(), o, ctl);
+                            running = play(r, page->chosen(), o, ctl, option == -2);
                             art.hold(false);
                             page->reload(o); // its pause menu may have changed them
                             if (lib.sort == Sort::recent) filter(); // the game just played comes first
@@ -271,6 +276,9 @@ int main(int argc, char **argv) {
                         } else if (option == 3) {
                             page->crosshair = !page->crosshair;
                             save_crosshair(o, page->chosen().romset, page->crosshair);
+                        } else if (option == 5) { // a PC-based game's folder: the system's chooser, answered below
+                            const Game &v = page->chosen();
+                            ask_for_folder(win, v.romset, v.rom.empty() ? o.roms : v.rom.parent_path());
                         } else if (option == 4) {   // the next region, from the next start
                             const std::vector<std::string> regions = core_regions(page->chosen());
                             size_t at = 0;
@@ -325,7 +333,7 @@ int main(int argc, char **argv) {
                     continue;
                 }
                 if (is(SDL_SCANCODE_ESCAPE, SDL_GAMEPAD_BUTTON_BACK)) running = false;
-                // The platform: All, Classic 2D, Model 1 ... Chihiro (those with games), round to All again; the order likewise.
+                // The platform: All, Classic 2D, Model 1 ... PC based (those with games), round to All again; the order likewise.
                 int platform_step = 0, sort_step = trigger;
                 if (is(SDL_SCANCODE_LEFT, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER)) platform_step = -1;
                 if (is(SDL_SCANCODE_RIGHT, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER)) platform_step = 1;
@@ -348,7 +356,27 @@ int main(int argc, char **argv) {
                     art.want(shown[sel].versions[0]->romset, {ArtKind::flyer, ArtKind::marquee, ArtKind::cabinet, ArtKind::ingame});
                     if (!page->folds()) page->open = 0; // one version: its settings out
                     page->reload(o);
+                    for (size_t v = 0; v < page->resumable.size(); ++v) // on Resume, when a version has it
+                        if (page->resumable[v]) {
+                            page->item = page->index_of(int(v), -2);
+                            break;
+                        }
                 }
+            }
+            // A game folder chosen for a PC-based game: kept, and the game found in it
+            std::string answered_set;
+            if (fs::path dir; folder_answer(answered_set, dir)) {
+                const std::string &set = answered_set;
+                for (Game &g : games)
+                    if (g.romset == set) {
+                        save_chosen_folder(o, set, dir);
+                        find_pc_game(g, o);
+                        if (g.rom.empty())
+                            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "Arcade Foundry: Insert Coin",
+                                                     (dir.string() + " doesn't hold " + g.title + ": its " +
+                                                      (g.program.empty() ? std::string("game") : g.program) + " isn't in it.").c_str(), win);
+                    }
+                filter();
             }
             if (running && page) draw_page(r, *page, o, art, images);
             else if (running && credits) credits_last = draw_credits(r, credits_top);

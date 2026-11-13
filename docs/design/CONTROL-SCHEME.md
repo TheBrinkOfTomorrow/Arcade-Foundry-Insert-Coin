@@ -55,7 +55,7 @@ Out of scope here:
 
 ### One input, filled once a frame
 
-`Controls.sample()` (Apple, `apple/InsertCoin/Input/Controls.swift`) and
+`Controls.sample()` (Apple, [`Input/Controls.swift`](https://github.com/TheBrinkOfTomorrow/Arcade-Foundry-IC-Kit/blob/main/Sources/Input/Controls.swift) in the kit) and
 `Controls::sample()` (Linux, `linux/input.cpp`) build one `afcore_input`
 per frame. It holds:
 
@@ -95,6 +95,10 @@ from a held start button. The shoulders send the shift buttons (which
 Manx TT and Virtua Racing read) and also step a gear 1-4 for the other
 cars.
 
+Crazy Taxi High Roller uses the shoulders as its shifter's Drive (right)
+and Reverse (left), and A or B (keys 1 or 2) as its JUMP button, which the
+core sends as buttons 1 and 2.
+
 ### Each kind of game
 
 Games.toml's `controls` picks the layout. The same names appear in the
@@ -121,6 +125,13 @@ Apple app's `GameControls` and in the Linux game list.
   - the mouse, or a touch;
   - a controller: either stick moves the aim, the right trigger or A
     fires, B reloads, and X throws The House of the Dead 4's grenade.
+    In Let's Go Jungle!, X (West on Linux, G or middle-click) presses its
+    player's Start as well: the cabinet's big Start buttons are the game's
+    action buttons during play (#404).
+    In Virtua Cop 3, X (West) changes weapon and Y (North, or F on the
+    keyboard) is the cabinet's foot pedal, on each player's own
+    controller; B reloads as in the others. In The House of the Dead III,
+    B reloads by pumping the gun's grip (the core pulls it twice).
 
   A crosshair shows the aim while a controller is connected, but not for
   the turrets, which draw their own sight. Model 3's guns can't sense a

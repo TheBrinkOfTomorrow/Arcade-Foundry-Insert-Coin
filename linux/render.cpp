@@ -133,21 +133,69 @@ SDL_FPoint menu_frame(SDL_Renderer *r) {
     return SDL_FPoint{ow / 4.f - 60, oh / 4.f - 30};
 }
 
-void draw_pause(SDL_Renderer *r, const Game &g, int item, bool operator_mode, const Look &look) {
-    const std::string shape = std::string("Shape: ") + Look::name(look.shape), effect = std::string("Effect: ") + Look::name(look.effect);
-    const char *const full = g_fullscreen ? "Full screen: on (F11)" : "Full screen: off (F11)";
-    const char *const menu[kMenuItems] = {"Resume", operator_mode ? "Leave operator mode" : "Operator mode (Test, Service)",
-                                          shape.c_str(), effect.c_str(), "Controller buttons", "Wheel and pedals", "Use this screen as the picture",
-                                          full, "Quit to library"};
+std::vector<PauseItem> pause_items(bool states) {
+    std::vector<PauseItem> out{PauseItem::resume};
+    if (states) out.insert(out.end(), {PauseItem::save_state, PauseItem::load_state});
+    out.insert(out.end(), {PauseItem::operator_mode, PauseItem::shape, PauseItem::effect, PauseItem::buttons, PauseItem::wheel,
+                           PauseItem::picture, PauseItem::fullscreen, PauseItem::quit});
+    return out;
+}
+
+void draw_pause(SDL_Renderer *r, const Game &g, const std::vector<PauseItem> &items, int item, bool operator_mode, const Look &look,
+                const std::string &note) {
+    const auto label = [&](PauseItem i) -> std::string {
+        switch (i) {
+        case PauseItem::resume: return "Resume";
+        case PauseItem::save_state: return "Save state";
+        case PauseItem::load_state: return "Load state";
+        case PauseItem::operator_mode: return operator_mode ? "Leave operator mode" : "Operator mode (Test, Service)";
+        case PauseItem::shape: return std::string("Shape: ") + Look::name(look.shape);
+        case PauseItem::effect: return std::string("Effect: ") + Look::name(look.effect);
+        case PauseItem::buttons: return "Controller buttons";
+        case PauseItem::wheel: return "Wheel and pedals";
+        case PauseItem::picture: return "Use this screen as the picture";
+        case PauseItem::fullscreen: return g_fullscreen ? "Full screen: on (F11)" : "Full screen: off (F11)";
+        case PauseItem::quit: return "Quit to library";
+        }
+        return "";
+    };
     float sx = 0, sy = 0;
     SDL_GetRenderScale(r, &sx, &sy);
     const SDL_FPoint at = menu_frame(r);
     const float x = at.x, y = at.y;
     SDL_RenderDebugText(r, x, y, "PAUSED");
     SDL_RenderDebugText(r, x, y + 12, g.title.c_str());
-    for (int i = 0; i < kMenuItems; ++i) {
-        const std::string line = std::string(i == item ? "> " : "  ") + menu[i];
+    for (int i = 0; i < int(items.size()); ++i) {
+        const std::string line = std::string(i == item ? "> " : "  ") + label(items[size_t(i)]);
         SDL_RenderDebugText(r, x, y + 34 + 14 * i, line.c_str());
+    }
+    if (!note.empty()) {
+        SDL_SetRenderDrawColor(r, 255, 255, 80, 255);
+        SDL_RenderDebugText(r, x, y + 34 + 14 * float(items.size()) + 8, note.c_str());
+    }
+    SDL_SetRenderScale(r, sx, sy);
+}
+
+void draw_slots(SDL_Renderer *r, const Game &g, bool saving, const std::vector<std::string> &lines, int row, SDL_Texture *picture) {
+    float sx = 0, sy = 0;
+    SDL_GetRenderScale(r, &sx, &sy);
+    const SDL_FPoint at = menu_frame(r);
+    const float x = at.x, y = at.y;
+    SDL_RenderDebugText(r, x, y, saving ? "SAVE STATE" : "LOAD STATE");
+    SDL_RenderDebugText(r, x, y + 12, g.title.c_str());
+    for (int i = 0; i < int(lines.size()); ++i) {
+        const std::string line = std::string(i == row ? "> " : "  ") + "Slot " + std::to_string(i + 1) + ": " + lines[size_t(i)];
+        SDL_RenderDebugText(r, x, y + 34 + 14 * i, line.c_str());
+    }
+    SDL_SetRenderDrawColor(r, 160, 160, 170, 255);
+    const float below = y + 34 + 14 * float(lines.size()) + 8;
+    SDL_RenderDebugText(r, x, below, saving ? "Return (South) saves here" : "Return (South) loads it");
+    if (!saving) SDL_RenderDebugText(r, x, below + 12, "Records go back to then too");
+    SDL_RenderDebugText(r, x, below + (saving ? 12 : 24), "Esc (East) back");
+    if (picture) { // the slot's screen, under the text
+        const SDL_FRect box{x * 2, (below + 40) * 2, 200, 150};
+        SDL_SetRenderScale(r, 1, 1);
+        SDL_RenderTexture(r, picture, nullptr, &box);
     }
     SDL_SetRenderScale(r, sx, sy);
 }

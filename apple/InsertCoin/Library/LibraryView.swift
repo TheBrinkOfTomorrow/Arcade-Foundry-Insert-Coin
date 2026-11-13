@@ -388,7 +388,7 @@ struct LibraryView: View {
 
     /// Games this build has a core for, with no ROM set here or in iCloud Drive.
     private var missing: [GameInfo] {
-        GameInfo.all.filter { CoreLibrary.exists($0.id) && Storage.rom($0.id) == nil && cloud.items[$0.id] == nil }
+        GameInfo.all.filter { !PCGames.isPC($0.id) && CoreLibrary.exists($0.id) && Storage.rom($0.id) == nil && cloud.items[$0.id] == nil }
     }
 
     /// What a card says about its game: playable, its ROM set missing, or no core.
@@ -400,6 +400,7 @@ struct LibraryView: View {
         let ready = built.filter { Storage.rom($0.id) != nil || cloud.items[$0.id] != nil }
         if ready.isEmpty {
             if let id = downloading, built.contains(where: { $0.id == id }) { return (downloads.label(id), false) }
+            if built.allSatisfy({ PCGames.isPC($0.id) }) { return ("Choose its game folder", false) }
             return ("No ROM set yet", false)
         }
         return (game.versions.count > 1 ? "\(ready.count) of \(game.versions.count) versions ready" : "Ready to play", true)
@@ -723,8 +724,8 @@ struct TouchControlsSection: View {
                     Text("On-screen controller").tag(false)
                 }
                 Text(aimByTouch
-                     ? "One finger aims and fires where it touches, a second reloads\(game.gunButton ? ", a third throws" : ""). No on-screen controller."
-                     : "The stick moves the crosshair, A fires, B reloads\(game.gunButton ? ", X throws" : "").")
+                     ? "One finger aims and fires where it touches, a second reloads\(game.gunButton ? (game.id == "vcop3" ? ", a third changes weapon" : ", a third throws") : ""). No on-screen controller."
+                     : "The stick moves the crosshair, A fires, B reloads\(game.gunButton ? (game.id == "vcop3" ? ", X changes weapon, Y is the pedal" : ", X throws") : "").")
                     .font(.caption).foregroundStyle(.secondary)
             }
             if !game.aimsGun || !aimByTouch {

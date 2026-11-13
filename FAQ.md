@@ -130,7 +130,7 @@ game the folder that holds its XBE (`vcop3/vc3.xbe`), not a ROM set. To
 go through iCloud Drive or a ROM server, it is packed as one file,
 `<set>.tar`. Add ROM with iCloud Drive on makes that file for you, and
 `scripts/pack_games.py` makes one for a ROM server (from a Chihiro `.7z`
-dump too). A device unpacks the
+dump or decrypted GD-ROM `.bin` image too). A device unpacks the
 file into `ROMs/<set>/` before the first play.
 
 Chihiro games also use MAME's `chihiro.zip` (the board's settings and ID).

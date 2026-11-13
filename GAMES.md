@@ -107,6 +107,7 @@ Recompiled from your ROM set ([Arcade-Foundry-Cores-Model12](https://github.com/
 | Virtua Racing | 1992 | `vr` | Link play | Yes | Yes | Yes | Yes |
 | Star Wars Arcade | 1993 | `swa` | The left stick flies | Yes | Yes | Yes | Yes |
 | Virtua Fighter | 1993 | `vf` | | Yes | Yes | Yes | Yes |
+| Virtua Formula | 1993 | `vformula` | Link play. A clone of Virtua Racing: MAME's merged `vr.7z` (or `.zip`) holds its files | Yes | Yes | Yes | Yes |
 | Wing War | 1994 | `wingwar` | MAME's I/O board set `model1io2.zip` (or `.7z`) must sit beside it. The left stick flies | Yes | Yes | Yes | Yes |
 <!-- GAMES:END model1 -->
 
@@ -146,7 +147,7 @@ Recompiled from your ROM set ([Arcade-Foundry-Cores-Model12](https://github.com/
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Rail Chase 2 | 1994 | `rchase2` | Revision A | Yes | Yes | Yes | Yes |
 | Virtua Striker | 1994 | `vstriker` | Revision A. X long pass, A shoot, B short pass | Yes | Yes | Yes | Yes |
-| Cyber Troopers Virtual-On | 1995 | `von` | Twin, Export | Yes | Yes | Yes | Yes |
+| Cyber Troopers Virtual-On | 1995 | `von` | Twin, Export, link play | Yes | Yes | Yes | Yes |
 | Fighting Vipers | 1995 | `fvipers` | Revision D | Yes | Yes | Yes | Yes |
 | Gunblade NY | 1995 | `gunblade` | Revision A | Yes | Yes | Yes | Yes |
 | INDY 500 | 1995 | `indy500` | Twin, Revision A, link play | Yes | Yes | Yes | Yes |
@@ -155,7 +156,7 @@ Recompiled from your ROM set ([Arcade-Foundry-Cores-Model12](https://github.com/
 | Sonic Championship | 1996 | `schamp` | USA. X punch, A kick, B barrier | Yes | Yes | Yes | Yes |
 | Super GT 24h | 1996 | `sgt24h` | Jaleco | Yes | Yes | Yes | Yes |
 | Dynamite Baseball 97 | 1997 | `dynabb97` | Revision A. X and A the buttons, B swings the bat | Yes | Yes | Yes | Yes |
-| Over Rev | 1997 | `overrevb` | Jaleco. Use the whole (non-merged) set, such as MAME's `overrevb.7z`: the split `.zip` lacks its parent's files | Yes | Yes | Yes | Yes |
+| Over Rev | 1997 | `overrevb` | Jaleco, link play. Use the whole (non-merged) set, such as MAME's `overrevb.7z`: the split `.zip` lacks its parent's files | Yes | Yes | Yes | Yes |
 | Zero Gunner | 1997 | `zerogun` | Export. X shot, A special | Yes | Yes | Yes | Yes |
 | Pilot Kids | 1998 | `pltkids` | Revision A. X shot, A special | Yes | Yes | Yes | Yes |
 <!-- GAMES:END model2b -->
@@ -166,7 +167,7 @@ Recompiled from your ROM set ([Arcade-Foundry-Cores-Model12](https://github.com/
 | Game | Year | Set | ROM notes | macOS | iOS | tvOS | Linux |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Sega Ski Super G | 1996 | `skisuprg` | A, B and X select, the shoulders zoom, the stick swings | Yes | Yes | Yes | Yes |
-| Sega Touring Car Championship | 1996 | `stcc` | | Yes | Yes | Yes | Yes |
+| Sega Touring Car Championship | 1996 | `stcc` | Link play | Yes | Yes | Yes | Yes |
 | Wave Runner | 1996 | `waverunr` | Japan, Revision A. The right trigger is the throttle lever | Yes | Yes | Yes | Yes |
 | Behind Enemy Lines | 1997 | `bel` | X the missile | Yes | Yes | Yes | Yes |
 | The House of the Dead | 1997 | `hotdo` | Original set. MAME's `hotd.7z` holding it also works | Yes | Yes | Yes | Yes |
@@ -181,16 +182,16 @@ Supermodel's machine as a core ([Arcade-Foundry-Cores-Model3](https://github.com
 <!-- GAMES:BEGIN model3 (scripts/gen_games.py writes this table from games.toml) -->
 | Game | Year | Set | ROM notes | macOS | iOS | tvOS | Linux |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Scud Race | 1996 | `scud` | | Yes | Yes | Yes | Yes |
+| Scud Race | 1996 | `scud` | Link play | Yes | Yes | Yes | Yes |
 | Virtua Fighter 3 | 1996 | `vf3` | | Yes | Yes | Yes | Yes |
-| Harley-Davidson & L.A. Riders | 1997 | `harley` | A view change, B music select; two coins per credit | Yes | Yes | Yes | Yes |
-| Le Mans 24 | 1997 | `lemans24` | | Yes | Yes | Yes | Yes |
+| Harley-Davidson & L.A. Riders | 1997 | `harley` | Link play. A view change, B music select; two coins per credit | Yes | Yes | Yes | Yes |
+| Le Mans 24 | 1997 | `lemans24` | Link play | Yes | Yes | Yes | Yes |
 | The Lost World | 1997 | `lostwsga` | Right button reloads | Yes | Yes | Yes | Yes |
-| Scud Race Plus | 1997 | `scudplus` | Scud Race Plus | Yes | Yes | Yes | Yes |
+| Scud Race Plus | 1997 | `scudplus` | Scud Race Plus, link play | Yes | Yes | Yes | Yes |
 | Cyber Troopers Virtual-On Oratorio Tangram | 1998 | `von2` | Two coins per credit | Yes | Yes | Yes | Yes |
-| Daytona USA 2 Power Edition | 1998 | `dayto2pe` | Power Edition | Yes | Yes | Yes | Yes |
-| Daytona USA 2: Battle on the Edge | 1998 | `daytona2` | Battle on the Edge | Yes | Yes | Yes | Yes |
-| Dirt Devils | 1998 | `dirtdvls` | A view change | Yes | Yes | Yes | Yes |
+| Daytona USA 2 Power Edition | 1998 | `dayto2pe` | Power Edition, link play | Yes | Yes | Yes | Yes |
+| Daytona USA 2: Battle on the Edge | 1998 | `daytona2` | Battle on the Edge, link play | Yes | Yes | Yes | Yes |
+| Dirt Devils | 1998 | `dirtdvls` | Link play. A view change | Yes | Yes | Yes | Yes |
 | Fighting Vipers 2 | 1998 | `fvipers2` | X punch, A kick, B guard | Yes | Yes | Yes | Yes |
 | Get Bass | 1998 | `getbass` | Japan, Standard. The left stick is the rod, the right trigger reels, X casts | Yes | Yes | Yes | Yes |
 | Get Bass | 1998 | `getbassur` | Japan, Upright. The left stick is the rod, the right trigger reels, X casts | Yes | Yes | Yes | Yes |
@@ -199,7 +200,7 @@ Supermodel's machine as a core ([Arcade-Foundry-Cores-Model3](https://github.com
 | Magical Truck Adventure | 1998 | `magtruck` | Japan. Pump the lever: the stick up and down; X the pedal | Yes | Yes | Yes | Yes |
 | The Ocean Hunter | 1998 | `oceanhuna` | Two coins per credit | Yes | Yes | Yes | Yes |
 | Sega Bass Fishing | 1998 | `bassdx` | Deluxe, USA. The left stick is the rod, the right trigger reels, the d-pad the lure stick, X casts, A selects | Yes | Yes | Yes | Yes |
-| Sega Rally 2 | 1998 | `srally2` | A view change, B hand brake | Yes | Yes | Yes | Yes |
+| Sega Rally 2 | 1998 | `srally2` | Link play. A view change, B hand brake | Yes | Yes | Yes | Yes |
 | Spikeout | 1998 | `spikeout` | X beat, A charge, B shift, Y jump | Yes | Yes | Yes | Yes |
 | Star Wars Trilogy Arcade | 1998 | `swtrilgy` | The left stick flies, left shoulder second trigger, B/X event buttons | Yes | Yes | Yes | Yes |
 | Emergency Call Ambulance | 1999 | `ecau` | A view change | Yes | Yes | Yes | Yes |
@@ -215,7 +216,7 @@ Recompiled from the game's disk ([Arcade-Foundry-Cores-Lindbergh](https://github
 | Game | Year | Set | ROM notes | macOS | iOS | tvOS | Linux |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | The House of the Dead 4 | 2005 | `hotd4a` | Revision A. The game folder that holds `disk0` (the older name `hotd4` also works). Middle-click, G, X or three fingers throw a grenade | Yes | Paid developer account | No | Yes |
-| Let's Go Jungle! Lost on the Island of Spice | 2006 | `letsgoju` | Lost on the Island of Spice. The game folder that holds `disk0` (the older name `lgj` also works). Hold to fire | Yes | Paid developer account | No | Yes |
+| Let's Go Jungle! Lost on the Island of Spice | 2006 | `letsgoju` | Lost on the Island of Spice. The game folder that holds `disk0` (the older name `lgj` also works). Hold to fire; Start or X is the action button | Yes | Paid developer account | No | Yes |
 | OutRun 2 SP SDX | 2006 | `outr2sdx` | The game folder that holds `disk0` (the older name `or2sp` also works). Wheel and pedals | Yes | Paid developer account | No | Yes |
 | Sega Race TV | 2008 | `segartv` | The game folder that holds `disk0`. Wheel and pedals | Yes | Paid developer account | No | Yes |
 <!-- GAMES:END lindbergh -->
@@ -238,9 +239,9 @@ Recompiled from the game's Xbox program, the XBE ([Arcade-Foundry-Cores-Chihiro]
 <!-- GAMES:BEGIN chihiro (scripts/gen_games.py writes this table from games.toml) -->
 | Game | Year | Set | ROM notes | macOS | iOS | tvOS | Linux |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| The House of the Dead III | 2002 | `hotd3` | The game folder that holds `hod3xb.xbe` | Not in this release | Not in this release | No | Not in this release |
-| Crazy Taxi High Roller | 2003 | `crtaxihr` | The game folder that holds `ctx_ac[r].xbe`. Steer with the left stick; the right trigger accelerates, the left brakes; the right shoulder is Drive, the left Reverse | Not in this release | Not in this release | No | Not in this release |
-| Virtua Cop 3 | 2003 | `vcop3` | The game folder that holds `vc3.xbe`. Middle-click, G, X or three fingers changes weapon | Not in this release | Not in this release | No | Not in this release |
+| The House of the Dead III | 2002 | `hotd3` | The game folder that holds `hod3xb.xbe`. B reloads (the gun's grip, pumped) | Yes | Not yet | No | Yes |
+| Crazy Taxi High Roller | 2003 | `crtaxihr` | The game folder that holds `ctx_ac[r].xbe`. Steer with the left stick; the right trigger accelerates, the left brakes; the right shoulder is Drive, the left Reverse; A or B jumps | Yes | Not yet | No | Yes |
+| Virtua Cop 3 | 2003 | `vcop3` | The game folder that holds `vc3.xbe`. B reloads; X, middle-click, G or three fingers changes weapon; Y or F is the pedal | Yes | Not yet | No | Yes |
 <!-- GAMES:END chihiro -->
 
 A Chihiro game is the game's files, not a ROM set. Put the folder that
